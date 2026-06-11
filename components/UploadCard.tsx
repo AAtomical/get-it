@@ -306,7 +306,7 @@ export default function UploadCard() {
                 <Link
                   key={d.id}
                   href={`/viewer/${d.id}`}
-                  className="group flex items-start gap-4 rounded-xl border border-[var(--border-subtle)] bg-white p-4 text-left transition hover:border-[var(--border-strong)]"
+                  className="group flex items-start gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-4 text-left transition hover:border-[var(--border-strong)]"
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-sunken)] text-[var(--ink-500)]">
                     <FileText className="h-5 w-5" aria-hidden />
@@ -350,7 +350,7 @@ export default function UploadCard() {
                 key={s.id}
                 onClick={() => startSample(s.id)}
                 disabled={busy != null}
-                className="group flex items-start gap-4 rounded-xl border border-[var(--border-subtle)] bg-white p-4 text-left transition hover:border-[var(--border-strong)] disabled:opacity-50"
+                className="group flex items-start gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-4 text-left transition hover:border-[var(--border-strong)] disabled:opacity-50"
               >
                 <div
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-sunken)]"

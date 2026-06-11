@@ -203,8 +203,8 @@ export default function PdfViewer({
   return (
     <div className="relative h-full">
       <div ref={scrollRef} className="relative flex h-full flex-col overflow-y-auto bg-white">
-        {detecting && (
-          <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-[var(--border-subtle)] bg-white/90 px-4 py-2 text-[12px] text-[var(--ink-500)] backdrop-blur">
+          {detecting && (
+          <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-[var(--border-subtle)] bg-[var(--surface-raised)]/90 px-4 py-2 text-[12px] text-[var(--ink-500)] backdrop-blur">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent-600)]" />
             codex is reading your document and tagging concepts…
           </div>
@@ -227,7 +227,7 @@ export default function PdfViewer({
       </div>
 
       {/* Page navigation — discreet cluster centered at the bottom */}
-      <div className="pointer-events-none absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-white/95 p-1 shadow-[0_2px_8px_rgba(17,17,19,0.06)] backdrop-blur">
+      <div className="pointer-events-none absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)]/95 p-1 shadow-[var(--shadow-nav)] backdrop-blur">
         <button
           type="button"
           onClick={() => goToPage(currentPage - 1)}
@@ -287,7 +287,7 @@ export default function PdfViewer({
       </div>
 
       {/* Zoom cluster — bottom-right of the document panel */}
-      <div className="pointer-events-none absolute bottom-3 right-3 z-30 flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-white/95 p-1 shadow-[0_2px_8px_rgba(17,17,19,0.06)] backdrop-blur">
+      <div className="pointer-events-none absolute bottom-3 right-3 z-30 flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)]/95 p-1 shadow-[var(--shadow-nav)] backdrop-blur">
         {zoomEditing ? (
           <div className="pointer-events-auto flex items-center px-1">
             <input

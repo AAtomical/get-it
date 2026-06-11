@@ -121,7 +121,7 @@ type Props = {
 
 export default function RightPane({ docId, mode, onModeChange, visualizer }: Props) {
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="flex h-full flex-col bg-[var(--surface-raised)]">
       <Header
         docId={docId}
         mode={mode}
@@ -129,7 +129,7 @@ export default function RightPane({ docId, mode, onModeChange, visualizer }: Pro
         visualizerSpec={visualizer.spec}
       />
 
-      <div className="relative min-h-0 flex-1 bg-white">
+      <div className="relative min-h-0 flex-1 bg-[var(--surface-raised)]">
         {mode === "visualizer" && (
           <VisualizerBody
             spec={visualizer.spec}
@@ -163,7 +163,7 @@ export default function RightPane({ docId, mode, onModeChange, visualizer }: Pro
       </div>
 
       {mode === "visualizer" && visualizer.spec && (
-        <footer className="shrink-0 border-t border-[var(--border-subtle)] bg-white px-5 py-3">
+        <footer className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--surface-raised)] px-5 py-3">
           <p className="text-[12.5px] leading-relaxed text-[var(--ink-700)]">
             {visualizer.spec.caption}
           </p>
@@ -176,7 +176,7 @@ export default function RightPane({ docId, mode, onModeChange, visualizer }: Pro
             <button
               type="button"
               onClick={visualizer.onRetry}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-amber-300 bg-white px-2.5 py-1 text-[12px] font-medium text-amber-800 transition hover:bg-amber-100"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-amber-300 bg-[var(--surface-raised)] px-2.5 py-1 text-[12px] font-medium text-amber-800 transition hover:bg-amber-100"
             >
               <RefreshCw className="h-3 w-3" /> Retry
             </button>
@@ -275,7 +275,7 @@ function Header({
         : current.description;
 
   return (
-    <header className="relative flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-white px-5 py-2">
+    <header className="relative flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-raised)] px-5 py-2">
       <div className="flex min-w-0 items-center gap-2.5">
         <div ref={ref} className="relative">
           <button
@@ -284,7 +284,7 @@ function Header({
             className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-[12px] font-medium transition-colors ${
               open
                 ? "border-[var(--accent-100)] bg-[var(--accent-50)] text-[var(--accent-700)]"
-                : "border-[var(--border-subtle)] bg-white text-[var(--ink-900)] hover:bg-[var(--surface-sunken)]"
+                : "border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--ink-900)] hover:bg-[var(--surface-sunken)]"
             }`}
           >
             <CurrentIcon className="h-3 w-3" />
@@ -299,7 +299,7 @@ function Header({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.12 }}
-                className="absolute left-0 top-full z-20 mt-1.5 w-72 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-white shadow-[0_8px_24px_rgba(17,17,19,0.08)]"
+                className="absolute left-0 top-full z-20 mt-1.5 w-72 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] shadow-[var(--shadow-popover)]"
               >
                 {MODES.map((m) => {
                   const Icon = m.Icon;
@@ -372,7 +372,7 @@ function Header({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.12 }}
-              className="absolute right-0 top-full z-20 mt-1.5 w-72 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-white shadow-[0_8px_24px_rgba(17,17,19,0.08)]"
+              className="absolute right-0 top-full z-20 mt-1.5 w-72 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] shadow-[var(--shadow-popover)]"
             >
               <button
                 type="button"

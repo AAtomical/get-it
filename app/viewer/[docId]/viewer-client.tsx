@@ -100,7 +100,7 @@ export default function ViewerClient({ docId }: { docId: string }) {
   useEffect(() => {
     const onChange = (e: Event) => {
       const detail = (e as CustomEvent).detail as
-        | { autoGenerate?: boolean; maxRetries?: number }
+        | { autoGenerate?: boolean; maxRetries?: number; theme?: string }
         | undefined;
       if (!detail) return;
       if (typeof detail.autoGenerate === "boolean") setAutoGenerate(detail.autoGenerate);
@@ -450,7 +450,7 @@ export default function ViewerClient({ docId }: { docId: string }) {
       </div>
 
       <div className="flex min-h-0 flex-1 gap-2 bg-[var(--surface-canvas)] p-2">
-        <div className="min-w-0 flex-1 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-white">
+        <div className="min-w-0 flex-1 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)]">
           <PdfViewer
             pdfUrl={meta.pdfUrl}
             numPages={meta.numPages}
@@ -461,7 +461,7 @@ export default function ViewerClient({ docId }: { docId: string }) {
             detecting={detecting}
           />
         </div>
-        <div className="flex w-[44%] min-w-[420px] max-w-[720px] flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-white">
+        <div className="flex w-[44%] min-w-[420px] max-w-[720px] flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)]">
           <RightPane
             docId={docId}
             mode={rightPaneMode}
@@ -526,7 +526,7 @@ function TagsChip({
     : "Visualization agent — scanning each page for the concepts worth tagging.";
   return (
     <span className="viz-tooltip-anchor relative inline-flex">
-      <div className="flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1 text-[11px]">
+      <div className="flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1 text-[11px]">
         {spinning ? (
           <RefreshCw className="h-3 w-3 animate-spin text-[var(--accent-600)]" />
         ) : (
@@ -648,7 +648,7 @@ function KGStatusBadge({ docId }: { docId: string }) {
 
   return (
     <span className="viz-tooltip-anchor relative inline-flex">
-      <div className="flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1 text-[11px]">
+      <div className="flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1 text-[11px]">
         {icon}
         <span className={`font-medium ${valueTone}`}>{label.split(" ")[0]}</span>
         <span className={tone}>{label.split(" ").slice(1).join(" ")}</span>

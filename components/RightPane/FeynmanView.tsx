@@ -217,7 +217,7 @@ export default function FeynmanView({ docId }: Props) {
   return (
     <div className="flex h-full">
       <aside className="flex w-56 shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--surface-canvas)]">
-        <div className="m-2 rounded-md border border-[var(--border-subtle)] bg-white p-2 shadow-[0_1px_0_rgba(17,17,19,0.02)]">
+        <div className="m-2 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-2">
           <div className="mb-2 flex items-center gap-1.5">
             <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-[var(--accent-100)] bg-[var(--accent-50)] text-[var(--accent-700)]">
               <Lightbulb className="h-3.5 w-3.5" />
@@ -241,7 +241,7 @@ export default function FeynmanView({ docId }: Props) {
             type="button"
             onClick={start}
             disabled={busy}
-            className="flex w-full items-center justify-center gap-1.5 rounded-md bg-[var(--ink-900)] py-1.5 text-[12px] font-medium text-white hover:bg-black disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-1.5 rounded-md bg-[var(--button-primary-bg)] py-1.5 text-[12px] font-medium text-white hover:bg-[var(--button-primary-hover)] disabled:opacity-50"
           >
             {busy ? (
               <>
@@ -260,7 +260,7 @@ export default function FeynmanView({ docId }: Props) {
                 type="button"
                 onClick={start}
                 disabled={busy}
-                className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-medium text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-[var(--feedback-wrong-border)] bg-[var(--feedback-wrong-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--feedback-wrong-text)] transition hover:opacity-80 disabled:opacity-50"
               >
                 <RefreshCw className="h-3 w-3" /> Retry
               </button>
@@ -296,7 +296,7 @@ export default function FeynmanView({ docId }: Props) {
         </div>
       </aside>
 
-      <section className="flex min-w-0 flex-1 flex-col bg-white">
+      <section className="flex min-w-0 flex-1 flex-col bg-[var(--surface-raised)]">
         {!active ? (
           <EmptyHint
             icon={<Lightbulb className="h-7 w-7 text-[var(--ink-400)]" />}
@@ -337,8 +337,8 @@ function SessionListItem({
     <div
       className={`group mb-1 rounded-md px-2 py-1.5 text-[11.5px] transition-colors ${
         active
-          ? "bg-white text-[var(--ink-900)] shadow-[0_1px_0_rgba(17,17,19,0.04)]"
-          : "text-[var(--ink-700)] hover:bg-white"
+          ? "bg-[var(--surface-raised)] text-[var(--ink-900)] shadow-[var(--shadow-nav)]"
+          : "text-[var(--ink-700)] hover:bg-[var(--surface-sunken)]"
       }`}
     >
       <div className="flex items-center gap-1.5">
@@ -409,7 +409,7 @@ function ActiveSession({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-white px-5 py-2.5">
+      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-raised)] px-5 py-2.5">
         <div className="mb-2 flex items-center justify-between gap-3 text-[11.5px] text-[var(--ink-500)]">
           <span className="flex min-w-0 items-center gap-2">
             <Lightbulb className="h-3.5 w-3.5 shrink-0 text-[var(--accent-600)]" />
@@ -438,7 +438,7 @@ function ActiveSession({
       ) : (
         <>
           {error && (
-            <p className="shrink-0 border-b border-rose-100 bg-rose-50 px-5 py-2 text-[11.5px] leading-relaxed text-rose-700">
+            <p className="shrink-0 border-b border-[var(--feedback-wrong-border)] bg-[var(--feedback-wrong-bg)] px-5 py-2 text-[11.5px] leading-relaxed text-[var(--feedback-wrong-text)]">
               {error} Your turn was kept — say or type it again to retry.
             </p>
           )}
@@ -713,7 +713,7 @@ function VoiceConsole({
               type="button"
               onClick={() => speakPrompt(prompt)}
               disabled={speaking}
-              className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--accent-700)] transition-colors hover:bg-white disabled:opacity-60"
+              className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--accent-700)] transition-colors hover:bg-[var(--surface-sunken)] disabled:opacity-60"
               title={speaking ? "Reading..." : "Play question"}
               aria-label="Play question"
             >
@@ -746,7 +746,7 @@ function VoiceConsole({
 
       <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-2">
         {hasTranscript && (
-          <div className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-900)]">
+          <div className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-900)]">
             <span>{finalText}</span>
             <span className="text-[var(--ink-400)]">{interimText}</span>
           </div>
@@ -772,13 +772,13 @@ function FeedbackCard({
   parts: string[];
 }) {
   return (
-    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4">
+    <div className="rounded-lg border border-[var(--feedback-correct-border)] bg-[var(--feedback-correct-bg)] px-5 py-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 text-emerald-700">
+        <div className="flex items-center gap-1.5 text-[var(--feedback-correct-icon)]">
           <BookOpenCheck className="h-3.5 w-3.5" />
           <p className="text-[11px] font-semibold uppercase tracking-wider">Session feedback</p>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-white/70 px-2 py-1 text-[11px] font-medium text-emerald-700">
+        <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--feedback-correct-border)] bg-[var(--feedback-correct-bg)] px-2 py-1 text-[11px] font-medium text-[var(--feedback-correct-text)]">
           <CheckCircle2 className="h-3.5 w-3.5" />
           Complete
         </span>

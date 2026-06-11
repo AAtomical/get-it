@@ -10,15 +10,16 @@
  * orchestrator in particular) can react mid-session without polling.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Settings2 } from "lucide-react";
+import { Settings2, Sun, Moon } from "lucide-react";
 import { AUTO_GENERATE_VIZ, MAX_VIZ_GEN_RETRIES } from "@/lib/config";
 import { APP_VERSION } from "@/lib/version";
 
 export type SettingsPayload = {
   autoGenerate: boolean;
   maxRetries: number;
+  theme?: "light" | "dark";
 };
 
 export const SETTINGS_EVENT = "getit:settings";
@@ -68,7 +69,7 @@ export default function SettingsButton() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.12 }}
-            className="absolute right-0 top-full z-30 mt-1.5 w-[22rem] overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-white shadow-[0_8px_24px_rgba(17,17,19,0.08)]"
+            className="absolute right-0 top-full z-30 mt-1.5 w-[22rem] overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] shadow-[var(--shadow-popover)]"
           >
             <SettingsPanel refreshKey={open ? "open" : "closed"} />
           </motion.div>
@@ -81,7 +82,17 @@ export default function SettingsButton() {
 function SettingsPanel({ refreshKey }: { refreshKey: string }) {
   const [autoGenerate, setAutoGenerate] = useState<boolean>(AUTO_GENERATE_VIZ);
   const [maxRetries, setMaxRetries] = useState<number>(MAX_VIZ_GEN_RETRIES);
+  const [theme, setTheme] = useState<"light" | "dark" | undefined>();
   const hydratedRef = useRef(false);
+
+  // Effective theme — if no explicit preference is stored, follow system.
+  const effectiveTheme = useMemo<"light" | "dark">(() => {
+    if (theme === "light" || theme === "dark") return theme;
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      return "dark";
+    }
+    return "light";
+  }, [theme]);
 
   // Fetch fresh on every popover open so external changes (CLI edits,
   // a previous run-through-the-wizard, etc.) show up.
@@ -95,6 +106,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
         if (cancelled) return;
         if (typeof s.autoGenerate === "boolean") setAutoGenerate(s.autoGenerate);
         if (typeof s.maxRetries === "number") setMaxRetries(s.maxRetries);
+        if (s.theme === "light" || s.theme === "dark") setTheme(s.theme);
         hydratedRef.current = true;
       })
       .catch(() => {
@@ -143,6 +155,13 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
     },
     [persist],
   );
+
+  const onThemeToggle = useCallback(() => {
+    const next = effectiveTheme === "dark" ? "light" : "dark";
+    setTheme(next);
+    persist({ theme: next });
+    document.documentElement.classList.toggle("dark", next === "dark");
+  }, [effectiveTheme, persist]);
 
   return (
     <>
@@ -194,6 +213,47 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
         </div>
       </div>
 
+      {/* Dark mode toggle */}
+      <div className="flex items-start gap-2.5 border-t border-[var(--border-subtle)] px-3 py-2.5">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={effectiveTheme === "dark"}
+          onClick={onThemeToggle}
+          className={`mt-0.5 inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${
+            effectiveTheme === "dark"
+              ? "bg-[var(--accent-600)]"
+              : "bg-[var(--surface-sunken)] ring-1 ring-inset ring-[var(--border-default)]"
+          }`}
+        >
+          <span
+            className={`inline-flex h-3 w-3 items-center justify-center rounded-full bg-white shadow transition-transform ${
+              effectiveTheme === "dark" ? "translate-x-3.5" : "translate-x-0.5"
+            }`}
+          >
+            {effectiveTheme === "dark" ? (
+              <Moon className="h-2 w-2 text-[var(--ink-700)]" />
+            ) : (
+              <Sun className="h-2 w-2 text-[var(--ink-500)]" />
+            )}
+          </span>
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="text-[12.5px] font-medium text-[var(--ink-900)]">
+            Dark mode
+          </p>
+          <p className="text-[11px] leading-relaxed text-[var(--ink-500)]">
+            {theme
+              ? effectiveTheme === "dark"
+                ? "Dark theme active."
+                : "Light theme active."
+              : effectiveTheme === "dark"
+                ? "Follows system — dark."
+                : "Follows system — light."}
+          </p>
+        </div>
+      </div>
+
       {/* Max retries number input */}
       <div className="flex items-start gap-2.5 border-t border-[var(--border-subtle)] px-3 py-2.5">
         <div className="min-w-0 flex-1">
@@ -214,7 +274,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
             const n = Number(e.target.value);
             if (Number.isFinite(n) && n >= 0) onMaxRetries(n);
           }}
-          className="h-7 w-14 shrink-0 rounded-md border border-[var(--border-subtle)] bg-white px-2 text-right text-[12.5px] font-medium tabular-nums text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
+          className="h-7 w-14 shrink-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 text-right text-[12.5px] font-medium tabular-nums text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
         />
       </div>
     </>

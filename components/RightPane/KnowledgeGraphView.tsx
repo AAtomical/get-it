@@ -1005,7 +1005,7 @@ function GraphCanvas({
   );
 
   return (
-    <div ref={containerRef} className="relative h-full w-full overflow-hidden bg-white">
+    <div ref={containerRef} className="relative h-full w-full overflow-hidden bg-[var(--surface-raised)]">
       <svg
         ref={svgRef}
         width={size.w}
@@ -1097,10 +1097,10 @@ function GraphCanvas({
                     style={{ transition: "r 180ms ease, opacity 220ms ease" }}
                   />
                 )}
-                {/* White backing so labels/edges under the node disappear */}
+                {/* Backing so labels/edges under the node disappear */}
                 <circle
                   r={r + 12}
-                  fill="white"
+                  fill="var(--surface-canvas)"
                   stroke={isSelected ? "#111113" : "transparent"}
                   strokeWidth={isSelected ? 4 : 0}
                   vectorEffect="non-scaling-stroke"
@@ -1119,7 +1119,7 @@ function GraphCanvas({
                   y={r + 14}
                   fontSize={fontSize}
                   fontWeight={fontWeight}
-                  fill="#1a1a1d"
+                  fill="var(--ink-900)"
                   textAnchor="middle"
                   dominantBaseline="hanging"
                   style={{
@@ -1140,12 +1140,12 @@ function GraphCanvas({
       </svg>
 
       {/* Hint — drag to pan, scroll to zoom */}
-      <div className="pointer-events-none absolute bottom-3 left-3 select-none rounded-md bg-white/85 px-2 py-1 text-[10px] text-[var(--ink-500)] shadow-[0_1px_0_rgba(17,17,19,0.04)] backdrop-blur-sm">
+      <div className="pointer-events-none absolute bottom-3 left-3 select-none rounded-md bg-[var(--surface-raised)]/85 px-2 py-1 text-[10px] text-[var(--ink-500)] shadow-[var(--shadow-nav)] backdrop-blur-sm">
         drag to pan · scroll to zoom
       </div>
 
       {/* Zoom controls */}
-      <div className="absolute bottom-3 right-3 flex flex-col overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-white/95 shadow-[0_8px_24px_rgba(17,17,19,0.08)] backdrop-blur-sm">
+      <div className="absolute bottom-3 right-3 flex flex-col overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)]/95 shadow-[var(--shadow-popover)] backdrop-blur-sm">
         <button
           type="button"
           onClick={() => zoomBy(0.8)}
@@ -1215,7 +1215,7 @@ function NodeOverlay({
       onClick={onClose}
     >
       {/* Backdrop — dims the graph behind so the focused panel pops */}
-      <div className="absolute inset-0 bg-white/55 backdrop-blur-[2px]" />
+      <div className="absolute inset-0 bg-[var(--surface-raised)]/55 backdrop-blur-[2px]" />
 
       <motion.div
         initial={{ opacity: 0, y: 8, scale: 0.97 }}
@@ -1223,7 +1223,7 @@ function NodeOverlay({
         exit={{ opacity: 0, y: 6, scale: 0.98 }}
         transition={{ duration: 0.18, ease: "easeOut" }}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-white shadow-[0_24px_60px_rgba(17,17,19,0.18),_0_4px_12px_rgba(17,17,19,0.06)]"
+        className="relative w-full max-w-md overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] shadow-[var(--shadow-popover)]"
       >
         <header className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] px-5 py-4">
           <div className="min-w-0">
@@ -1277,28 +1277,28 @@ function NodeOverlay({
           <button
             type="button"
             onClick={() => onJumpToTool?.("chat", node.label)}
-            className="rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1.5 text-[11.5px] font-medium text-[var(--ink-700)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-900)]"
+            className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1.5 text-[11.5px] font-medium text-[var(--ink-700)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-900)]"
           >
             Chat
           </button>
           <button
             type="button"
             onClick={() => onJumpToTool?.("flashcards", node.label)}
-            className="rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1.5 text-[11.5px] font-medium text-[var(--ink-700)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-900)]"
+            className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1.5 text-[11.5px] font-medium text-[var(--ink-700)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-900)]"
           >
             Flashcards
           </button>
           <button
             type="button"
             onClick={() => onJumpToTool?.("quizzes", node.label)}
-            className="rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1.5 text-[11.5px] font-medium text-[var(--ink-700)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-900)]"
+            className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1.5 text-[11.5px] font-medium text-[var(--ink-700)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-900)]"
           >
             Quizzes
           </button>
           <button
             type="button"
             onClick={() => onJumpToTool?.("feynman", node.label)}
-            className="rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1.5 text-[11.5px] font-medium text-[var(--ink-700)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-900)]"
+            className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1.5 text-[11.5px] font-medium text-[var(--ink-700)] hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-900)]"
           >
             Feynman
           </button>

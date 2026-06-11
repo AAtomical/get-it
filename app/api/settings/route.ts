@@ -32,6 +32,12 @@ export async function POST(req: Request) {
         ? b.maxRetries
         : current.maxRetries,
   };
+  if (b.theme === "light" || b.theme === "dark") {
+    next.theme = b.theme;
+  } else if (b.theme === null) {
+    // Explicitly clearing the theme preference (back to system).
+    delete next.theme;
+  }
   saveSettings(next);
   return NextResponse.json(next);
 }
