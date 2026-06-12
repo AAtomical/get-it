@@ -415,11 +415,18 @@ function ensureIpcHandlers() {
   ipcMain.handle("wizard:login", async (_e, provider) => {
     if (provider === "claude") {
       const { exec } = require('child_process');
+      const binPath = resolveBundledBinary("claude");
+      if (!binPath) {
+        sendStatus({ phase: "error", message: "Claude CLI binary not found. Installation may be corrupted." });
+        return refreshCodexStatus();
+      }
+      const isJs = binPath.endsWith(".js");
+      const cmdBin = isJs ? `"${process.execPath}" "${binPath}"` : `"${binPath}"`;
       const cmd = process.platform === "win32" 
-        ? 'start cmd.exe /c "npx -y @anthropic-ai/claude-code auth login & pause"' 
+        ? `start cmd.exe /c "${isJs ? `""${process.execPath}" "${binPath}""` : `""${binPath}""`} auth login & pause"` 
         : process.platform === "darwin" 
-        ? `osascript -e 'tell app "Terminal" to do script "npx -y @anthropic-ai/claude-code auth login"'` 
-        : `x-terminal-emulator -e 'npx -y @anthropic-ai/claude-code auth login' || gnome-terminal -- npx -y @anthropic-ai/claude-code auth login || xterm -e 'npx -y @anthropic-ai/claude-code auth login'`;
+        ? `osascript -e 'tell app "Terminal" to do script "${cmdBin} auth login"'` 
+        : `x-terminal-emulator -e '${cmdBin} auth login' || gnome-terminal -- ${cmdBin} auth login || xterm -e '${cmdBin} auth login'`;
       exec(cmd);
       return;
     }
