@@ -31,9 +31,6 @@
     "build:desktop:all": "node scripts/build-electron.mjs --all"
   },
   "dependencies": {
-    "@anthropic-ai/claude-code": "^2.1.170",
-    "@earendil-works/pi-coding-agent": "^0.79.1",
-    "@google/gemini-cli": "^0.45.3",
     "@openai/codex-sdk": "^0.130.0",
     "@tailwindcss/typography": "^0.5.19",
     "clsx": "^2.1.1",
@@ -52,6 +49,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@anthropic-ai/claude-code": "^2.1.170",
+    "@earendil-works/pi-coding-agent": "^0.79.1",
+    "@google/gemini-cli": "^0.45.3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pdfkit": "^0.17.6",
