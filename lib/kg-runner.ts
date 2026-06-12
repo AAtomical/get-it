@@ -101,6 +101,10 @@ function packPages(pages: { pageIndex: number; text: string }[]): string[] {
 
 const buildInFlight = new Map<string, Promise<KnowledgeGraph>>();
 
+export function isBuilding(docId: string): boolean {
+  return buildInFlight.has(docId);
+}
+
 export async function buildKG(docId: string): Promise<KnowledgeGraph> {
   // Reuse a result that's already on disk (idempotent at the API layer).
   const existing = loadKG(docId);

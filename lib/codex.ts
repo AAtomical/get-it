@@ -1,29 +1,44 @@
 /**
- * Thin wrapper around @openai/codex-sdk that gives us:
- *   - lazily-initialized singleton
- *   - sane defaults for "answer-only" mode (read-only sandbox, no approvals,
- *     web search off by default)
- *   - a `runJson` helper that runs a one-shot turn against an output-schema
- *     and returns the parsed JSON, with retry-on-parse-failure
- *   - structured CodexError classification (auth lost vs rate-limit vs
- *     generic). Every agent call funnels through here, so the rest of the
- *     app gets a single, stable shape to display.
+ * AI provider router — public API for the entire app.
  *
- * Note on the Codex binary: in packaged Electron builds the main process
- * resolves the bundled binary and exposes its absolute path through
- * CODEX_BINARY_PATH. Passing that path to the SDK avoids fragile
- * node_modules lookup from the standalone Next server.
+ * This file is the ONLY entry point every agent, API route, and job
+ * queue uses for AI calls. It exposes the exact same public surface as
+ * the original Codex-only version:
+ *
+ *   - runJson<T>(prompt, schema, opts?)          → one-shot JSON
+ *   - runJsonInThread<T>({ start|resume, … })    → multi-turn JSON
+ *   - CodexError, CodexErrorKind                 → structured errors
+ *   - getCodexHealth(), classifyCodexError()      → health/error system
+ *
+ * Internally it reads `loadSettings().provider` and delegates to the
+ * active AIProvider implementation (Codex SDK, Gemini CLI, Claude Code, or BYOK).
+ *
+ * The health tracking, preflight rate-limit guard, and error classification
+ * are provider-agnostic — every provider's thrown errors get classified
+ * through the same regex battery and surfaced in the same banner.
+ *
+ * Note on naming: we keep the "Codex" names (CodexError, CodexHealth, etc.)
+ * in the public API so that no downstream file needs import changes.
  */
 
-import { Codex } from "@openai/codex-sdk";
-import type { ThreadOptions } from "@openai/codex-sdk";
-import { CODEX_SCRATCH_DIR } from "./paths";
+import { loadSettings } from "./settings-store";
+import type { AIProvider, RunOptions as ProviderRunOptions } from "./provider-types";
+import type { ProviderName } from "./provider-types";
+import { CodexProvider } from "./providers/codex-provider";
+import { GeminiProvider } from "./providers/gemini-provider";
+import { ClaudeProvider } from "./providers/claude-provider";
+import { PiProvider } from "./providers/pi-provider";
 import { CodexError, classifyCodexError } from "./codex-errors";
 import type { CodexErrorKind } from "./codex-errors";
 
-// Pure error model + presentation live in codex-errors.ts (no SDK dependency,
-// so they're unit-testable). Re-export them here so callers keep importing
-// the whole Codex surface from "@/lib/codex".
+// Re-export RunOptions from here so existing imports keep working.
+// Add back the threadOverrides for Codex-specific callers.
+export type RunOptions = ProviderRunOptions & {
+  /** Override default thread options (Codex-specific, ignored by CLI providers). */
+  threadOverrides?: Record<string, unknown>;
+};
+
+// Pure error model + presentation live in codex-errors.ts
 export {
   CodexError,
   classifyCodexError,
@@ -31,103 +46,40 @@ export {
 } from "./codex-errors";
 export type { CodexErrorKind } from "./codex-errors";
 
-/**
- * The model every generative call runs on, pinned explicitly.
- *
- * Why pin it: the SDK only passes `--model` to the codex binary when we set
- * this option. If we leave it unset, the binary resolves the model itself —
- * first from the user's personal `~/.codex/config.toml`, then from a default
- * baked into the bundled binary. That bundled default is a now-retired model
- * (`gpt-5.3-codex`), which OpenAI rejects for ChatGPT-account auth with a 400
- * ("model is not supported when using Codex with a ChatGPT account"). It only
- * appeared to work for developers because their local `config.toml` happened
- * to override the default with a current model; users with a clean `~/.codex`
- * fell through to the dead default. Pinning here makes every install — across
- * OS, arch, and environment — deterministically use the same supported model,
- * independent of the binary's default and of any local config.
- *
- * Keep this current with the models available to ChatGPT-account auth. When
- * OpenAI retires it, ship an app update bumping this value (the in-app
- * "model unsupported" banner tells users exactly that).
- */
-export const CODEX_MODEL = "gpt-5.5";
-
-let _codex: Codex | null = null;
-
-function getCodex(): Codex {
-  if (_codex) return _codex;
-  const codexPathOverride = process.env.CODEX_BINARY_PATH;
-  _codex = new Codex({
-    ...(codexPathOverride ? { codexPathOverride } : {}),
-    config: {
-      // disable image generation so we can use 'low' reasoning; the demo is
-      // text-only so there is nothing to lose.
-      tools: { image_gen: false },
-    },
-  });
-  return _codex;
-}
-
-export type RunOptions = {
-  /** Defaults to "low" — fastest answer-only model setting that allows tools=image_gen=false. */
-  reasoning?: "low" | "medium" | "high";
-  /** Allow live web search for this call (e.g. legal citations). */
-  webSearch?: boolean;
-  /** AbortSignal forwarded to the underlying child process. */
-  signal?: AbortSignal;
-  /** Override default thread options. */
-  threadOverrides?: Partial<ThreadOptions>;
+// ── Provider singletons ─────────────────────────────────────────────────
+const providers: Record<ProviderName, AIProvider> = {
+  codex: new CodexProvider(),
+  gemini: new GeminiProvider(),
+  claude: new ClaudeProvider(),
+  pi: new PiProvider(),
 };
 
-function threadOptions(opts: RunOptions = {}): ThreadOptions {
-  return {
-    model: CODEX_MODEL,
-    sandboxMode: "read-only",
-    approvalPolicy: "never",
-    skipGitRepoCheck: true,
-    workingDirectory: CODEX_SCRATCH_DIR,
-    modelReasoningEffort: opts.reasoning ?? "low",
-    webSearchEnabled: opts.webSearch ?? false,
-    ...(opts.threadOverrides ?? {}),
-  };
+function activeProvider(): AIProvider {
+  const name = loadSettings().provider;
+  return providers[name] ?? providers.codex;
 }
 
-function buildThread(opts: RunOptions = {}) {
-  return getCodex().startThread(threadOptions(opts));
-}
-
-/** Strip markdown code fences the model sometimes wraps JSON in, then parse. */
-function parseTurnJson<T>(finalResponse: string | undefined): T {
-  const text = finalResponse?.trim();
-  if (!text) throw new Error("Empty finalResponse from codex");
-  const cleaned = text
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/```$/i, "")
-    .trim();
-  return JSON.parse(cleaned) as T;
+/** Return the currently-selected provider name. */
+export function getActiveProviderName(): ProviderName {
+  return loadSettings().provider;
 }
 
 // ── Health mailbox ──────────────────────────────────────────────────────
-// Process-local snapshot of the most recent CodexError. The UI polls
-// /api/codex/health to render a banner with a countdown + reconnect
-// button. We also use it to short-circuit calls while a rate limit is
-// still active — no point hammering the API.
 export type CodexHealth = {
   ok: boolean;
   kind: CodexErrorKind | null;
   message: string | null;
   retryAt: number | null;
   window: "5h" | "weekly" | "unknown" | null;
-  /** Monotone counter — UI uses this to detect "a new error came in" vs
-   *  "still the same one I'm already showing". */
   serial: number;
-  /** Last successful Codex call timestamp (epoch ms). */
   lastOkAt: number | null;
 };
 
+type HealthMap = Record<ProviderName, CodexHealth>;
+
 declare global {
   // eslint-disable-next-line no-var
-  var __getitCodexHealth: CodexHealth | undefined;
+  var __getitHealthState: HealthMap | undefined;
 }
 
 const _initialHealth: CodexHealth = {
@@ -140,13 +92,19 @@ const _initialHealth: CodexHealth = {
   lastOkAt: null,
 };
 
-const health: CodexHealth =
-  globalThis.__getitCodexHealth ??
-  (globalThis.__getitCodexHealth = { ..._initialHealth });
+const healthMap: HealthMap = globalThis.__getitHealthState ?? (globalThis.__getitHealthState = {
+  codex: { ..._initialHealth },
+  gemini: { ..._initialHealth },
+  claude: { ..._initialHealth },
+  pi: { ..._initialHealth },
+});
+
+function getHealth(providerName?: ProviderName): CodexHealth {
+  return healthMap[providerName ?? getActiveProviderName()];
+}
 
 export function getCodexHealth(): CodexHealth {
-  // If a rate-limit retry deadline has passed, auto-clear so the UI
-  // stops showing the banner without a server round-trip.
+  const health = getHealth();
   if (
     health.kind === "rate_limit" &&
     health.retryAt != null &&
@@ -157,7 +115,8 @@ export function getCodexHealth(): CodexHealth {
   return { ...health };
 }
 
-function markOk() {
+function markOk(providerName: ProviderName) {
+  const health = getHealth(providerName);
   if (!health.ok) {
     Object.assign(health, _initialHealth, { serial: health.serial + 1 });
   }
@@ -165,7 +124,8 @@ function markOk() {
   health.ok = true;
 }
 
-function markError(err: CodexError) {
+function markError(providerName: ProviderName, err: CodexError) {
+  const health = getHealth(providerName);
   health.ok = false;
   health.kind = err.kind;
   health.message = err.message;
@@ -174,7 +134,8 @@ function markError(err: CodexError) {
   health.serial += 1;
 }
 
-function preflightHealth(): CodexError | null {
+function preflightHealth(providerName: ProviderName): CodexError | null {
+  const health = getHealth(providerName);
   if (
     health.kind === "rate_limit" &&
     health.retryAt != null &&
@@ -188,6 +149,8 @@ function preflightHealth(): CodexError | null {
   return null;
 }
 
+// ── Public API ──────────────────────────────────────────────────────────
+
 /**
  * Run a single turn that must return JSON conforming to the supplied schema.
  * Retries once if the model returns un-parseable text. Throws CodexError on
@@ -198,53 +161,30 @@ export async function runJson<T>(
   outputSchema: object,
   opts: RunOptions = {},
 ): Promise<{ data: T; usage: unknown }> {
-  // Short-circuit: if we know we're inside a rate-limit window, fail fast
-  // without burning another Codex call.
-  const preflight = preflightHealth();
+  const providerName = getActiveProviderName();
+  const preflight = preflightHealth(providerName);
   if (preflight) throw preflight;
 
-  let lastErr: unknown = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const thread = buildThread(opts);
-    try {
-      const turn = await thread.run(prompt, {
-        outputSchema,
-        signal: opts.signal,
-      });
-      const parsed = parseTurnJson<T>(turn.finalResponse);
-      markOk();
-      return { data: parsed, usage: turn.usage };
-    } catch (err) {
-      lastErr = err;
-      const classified = classifyCodexError(err);
-      // Auth/rate-limit/binary failures: don't bother retrying — the
-      // condition isn't going to clear in 200ms. Bubble up immediately so
-      // the in-app banner can take over.
-      if (classified.kind !== "generic") {
-        markError(classified);
-        throw classified;
-      }
+  try {
+    const provider = providers[providerName] ?? providers.codex;
+    const result = await provider.runJson<T>(prompt, outputSchema, opts);
+    markOk(providerName);
+    return result;
+  } catch (err) {
+    const classified = classifyCodexError(err);
+    if (classified.kind !== "generic") {
+      markError(providerName, classified);
     }
+    throw classified;
   }
-  const finalErr = classifyCodexError(lastErr);
-  if (finalErr.kind !== "generic") markError(finalErr);
-  throw finalErr;
 }
 
 /**
  * Thread-aware JSON runner for multi-turn tools (chat).
  *
  * Two modes, exactly one of which must be supplied:
- *   • start  — open a NEW thread and send the full first-turn prompt (system
- *              + document + history). Returns the new `threadId` to persist.
- *              Retries once on a parse blip, like runJson.
- *   • resume — continue an EXISTING thread by `threadId`, sending only the new
- *              turn input. The model still has the document + prior turns in
- *              its own context, so we don't resend them (and the stable prefix
- *              is a guaranteed cache hit). No internal retry: on any generic
- *              failure (including a lost/expired session) the caller falls
- *              back to `start` with full context, so a resume never silently
- *              degrades the answer.
+ *   • start  — open a NEW thread and send the full first-turn prompt
+ *   • resume — continue an EXISTING thread by `threadId`
  *
  * Rate-limit / auth / binary errors are classified and thrown immediately in
  * both modes so the health banner takes over.
@@ -255,50 +195,20 @@ export async function runJsonInThread<T>(args: {
   resume?: { threadId: string; input: string };
   start?: { input: string };
 }): Promise<{ data: T; usage: unknown; threadId: string | null }> {
-  const preflight = preflightHealth();
+  const providerName = getActiveProviderName();
+  const preflight = preflightHealth(providerName);
   if (preflight) throw preflight;
-  const opts = args.opts ?? {};
 
-  if (args.resume) {
-    const thread = getCodex().resumeThread(args.resume.threadId, threadOptions(opts));
-    try {
-      const turn = await thread.run(args.resume.input, {
-        outputSchema: args.outputSchema,
-        signal: opts.signal,
-      });
-      const parsed = parseTurnJson<T>(turn.finalResponse);
-      markOk();
-      return { data: parsed, usage: turn.usage, threadId: thread.id ?? args.resume.threadId };
-    } catch (err) {
-      const classified = classifyCodexError(err);
-      if (classified.kind !== "generic") markError(classified);
-      throw classified;
+  try {
+    const provider = providers[providerName] ?? providers.codex;
+    const result = await provider.runJsonInThread<T>(args);
+    markOk(providerName);
+    return result;
+  } catch (err) {
+    const classified = classifyCodexError(err);
+    if (classified.kind !== "generic") {
+      markError(providerName, classified);
     }
+    throw classified;
   }
-
-  if (!args.start) throw new Error("runJsonInThread: provide `start` or `resume`");
-
-  let lastErr: unknown = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const thread = buildThread(opts);
-    try {
-      const turn = await thread.run(args.start.input, {
-        outputSchema: args.outputSchema,
-        signal: opts.signal,
-      });
-      const parsed = parseTurnJson<T>(turn.finalResponse);
-      markOk();
-      return { data: parsed, usage: turn.usage, threadId: thread.id };
-    } catch (err) {
-      lastErr = err;
-      const classified = classifyCodexError(err);
-      if (classified.kind !== "generic") {
-        markError(classified);
-        throw classified;
-      }
-    }
-  }
-  const finalErr = classifyCodexError(lastErr);
-  if (finalErr.kind !== "generic") markError(finalErr);
-  throw finalErr;
 }

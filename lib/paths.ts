@@ -22,7 +22,7 @@
  *     docs/<docId>/workctx.json       — chat / flashcards / quizzes / feynman journal
  *     docs/<docId>/kg.json            — knowledge graph
  *     docs/<docId>/tags.json          — server-side persisted visualizer tags
- *     codex-scratch/                  — codex CLI's per-call working dir
+ *     codex-scratch/                  — AI CLI working dir (used by all providers)
  */
 
 import fs from "node:fs";
@@ -57,6 +57,8 @@ export const DATA_DIR: string = process.env.GETIT_DATA_DIR
 export const DOCS_DIR = path.join(DATA_DIR, "docs");
 export const DOCS_INDEX_PATH = path.join(DATA_DIR, "docs.json");
 export const CODEX_SCRATCH_DIR = path.join(DATA_DIR, "codex-scratch");
+/** Preferred alias — same directory, provider-neutral name. */
+export const SCRATCH_DIR = CODEX_SCRATCH_DIR;
 
 // Eagerly ensure the top-level directories exist. fs.mkdirSync with
 // recursive:true is a no-op when they're already there.

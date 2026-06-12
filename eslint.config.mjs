@@ -12,7 +12,16 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "electron/*-bin/**",
+    "electron/assets/**",
+    "public/pdf.worker.min.mjs",
   ]),
+  {
+    files: ["electron/**/*.js", "**/*.cjs"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

@@ -32,6 +32,8 @@ export type Tag = {
   ready: boolean;
   /** Currently fetching the spec — show spinner, disable click. */
   generating: boolean;
+  /** Generation/render failed — show a red ring, clicking re-selects it. */
+  error?: string;
 };
 
 type Props = {
@@ -42,6 +44,7 @@ type Props = {
   activeTagId: string | null;
   onTagClick: (tagId: string) => void;
   detecting?: boolean;
+  providerLabel?: string;
 };
 
 function truncateTagLabel(label: string): string {
@@ -57,6 +60,7 @@ export default function PdfViewer({
   activeTagId,
   onTagClick,
   detecting,
+  providerLabel,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
@@ -206,7 +210,7 @@ export default function PdfViewer({
         {detecting && (
           <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-[var(--border-subtle)] bg-white/90 px-4 py-2 text-[12px] text-[var(--ink-500)] backdrop-blur">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent-600)]" />
-            codex is reading your document and tagging concepts…
+            {providerLabel ?? "Codex CLI"} is reading your document and tagging concepts…
           </div>
         )}
         <div className="flex flex-col items-center gap-7 px-6 py-8">
@@ -462,9 +466,17 @@ function TagPill({
     ? labelWithType
     : tag.generating
       ? `${labelWithType} (preparing visualization...)`
-      : `${labelWithType} (click to generate)`;
+      : tag.error
+        ? `${labelWithType} (failed — click to retry)`
+        : `${labelWithType} (click to generate)`;
   const tooltipId = `pdf-tag-tooltip-${tag.id}`;
-  const stateAttr = tag.ready ? "ready" : tag.generating ? "generating" : "idle";
+  const stateAttr = tag.ready
+    ? "ready"
+    : tag.generating
+      ? "generating"
+      : tag.error
+        ? "error"
+        : "idle";
   const displayLabel = truncateTagLabel(tag.label);
 
   return (

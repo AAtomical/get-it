@@ -110,6 +110,18 @@ module.exports = async function afterPack(context) {
     console.log(`[after-pack] restored ${rel} (${fileCount} files)`);
   }
 
+  // Next.js standalone tracing drops these heavy/CLI-only dependencies because
+  // they aren't explicitly imported in server code, but we need them in the bundle.
+  const explicitKeep = ["@google", "@anthropic-ai", "@langchain"];
+  for (const pkg of explicitKeep) {
+    const pkgSrc = path.join(projectDir, "node_modules", pkg);
+    const pkgDest = path.join(appResources, ".next/standalone/node_modules", pkg);
+    if (fs.existsSync(pkgSrc)) {
+      copyDirSync(pkgSrc, pkgDest);
+      console.log(`[after-pack] explicitly kept ${pkg} in standalone node_modules`);
+    }
+  }
+
   // Drop the wrong-platform Codex binaries.
   //
   // `@openai/codex`'s install pulls every supported platform tarball as
@@ -158,6 +170,30 @@ module.exports = async function afterPack(context) {
     }
     if (pruned > 0) {
       console.log(`[after-pack] pruned ${pruned} non-target Codex platform package(s); kept ${keepPkg}`);
+    }
+  }
+
+  const keepClaudePkg = `claude-code-${platformKey}-${arch}`;
+  const claudeRoots = [
+    path.join(appResources, "node_modules", "@anthropic-ai"),
+    path.join(appResources, ".next", "standalone", "node_modules", "@anthropic-ai")
+  ];
+  for (const claudeModules of claudeRoots) {
+    if (fs.existsSync(claudeModules)) {
+      let pruned = 0;
+      for (const entry of fs.readdirSync(claudeModules)) {
+        if (entry === "claude-code" || entry === keepClaudePkg) continue;
+        if (entry.startsWith("claude-code-")) {
+          fs.rmSync(path.join(claudeModules, entry), {
+            recursive: true,
+            force: true,
+          });
+          pruned += 1;
+        }
+      }
+      if (pruned > 0) {
+        console.log(`[after-pack] pruned ${pruned} non-target Claude platform package(s) in ${claudeModules}; kept ${keepClaudePkg}`);
+      }
     }
   }
 };

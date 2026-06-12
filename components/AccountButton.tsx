@@ -3,10 +3,9 @@
 /**
  * Top-bar Account button + popover.
  *
- * Shows the currently authenticated ChatGPT/Codex identity, the 5h and
- * weekly usage windows (fetched fresh every time the popover opens),
- * and a Sign-out button that runs `codex logout` and re-launches the
- * Electron setup wizard. Designed to live on every page's top bar.
+ * Provider-aware: shows a full Codex panel (JWT identity, rate-limit bars)
+ * when using Codex CLI, or a stub panel (provider name, auth status, version,
+ * help links) for Gemini CLI / Claude Code.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -16,9 +15,21 @@ import {
   LogOut,
   RefreshCw,
   User as UserIcon,
+  CheckCircle2,
+  XCircle,
+  ExternalLink,
+  Settings2,
 } from "lucide-react";
 
-type AccountSnapshot = {
+import type { ProviderName } from "@/lib/provider-types";
+
+type ProviderStatus = {
+  provider: ProviderName;
+  label: string;
+  docsUrl: string;
+  installed: boolean;
+  authenticated: boolean;
+  version: string | null;
   account: {
     email: string | null;
     name: string | null;
@@ -80,7 +91,7 @@ export default function AccountButton() {
         </button>
         {!open && (
           <span className="viz-tooltip" role="tooltip">
-            Your ChatGPT account, usage limits and sign-out.
+            AI provider account, usage and sign-out.
           </span>
         )}
       </span>
@@ -103,7 +114,7 @@ export default function AccountButton() {
 }
 
 function AccountPanel({ refreshKey }: { refreshKey: string }) {
-  const [data, setData] = useState<AccountSnapshot | null>(null);
+  const [data, setData] = useState<ProviderStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -113,10 +124,10 @@ function AccountPanel({ refreshKey }: { refreshKey: string }) {
     let cancelled = false;
     setLoading(true);
     setErr(null);
-    fetch("/api/codex/account", { cache: "no-store" })
+    fetch("/api/provider/status", { cache: "no-store" })
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return (await r.json()) as AccountSnapshot;
+        return (await r.json()) as ProviderStatus;
       })
       .then((d) => {
         if (!cancelled) {
@@ -139,7 +150,7 @@ function AccountPanel({ refreshKey }: { refreshKey: string }) {
     if (loggingOut) return;
     if (
       !confirm(
-        "Sign out of Codex? Your library and study data stay on this device.",
+        "Sign out? Your library and study data stay on this device.",
       )
     ) {
       return;
@@ -160,18 +171,20 @@ function AccountPanel({ refreshKey }: { refreshKey: string }) {
     setLoggingOut(false);
   }, [loggingOut]);
 
+  const isCodex = data?.provider === "codex";
+
   return (
     <div className="px-3 py-2.5">
       <div className="flex items-center justify-between">
         <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-500)]">
-          ChatGPT account
+          {data?.label ?? "AI Provider"} account
         </p>
         <button
           type="button"
           onClick={handleLogout}
-          disabled={loggingOut || (!data?.account && !err)}
-          title="Sign out of Codex and return to the setup wizard"
-          className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-0.5 text-[10.5px] font-medium text-[var(--ink-700)] transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
+          disabled={loggingOut || !data || data.provider !== "codex"}
+          title={!data || data.provider === "codex" ? "Sign out of Codex and return to the setup wizard" : "Change settings in the Settings menu"}
+          className={`inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-0.5 text-[10.5px] font-medium text-[var(--ink-700)] transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50 ${!data || data.provider !== "codex" ? "invisible" : ""}`}
         >
           {loggingOut ? (
             <RefreshCw className="h-2.5 w-2.5 animate-spin" />
@@ -185,48 +198,90 @@ function AccountPanel({ refreshKey }: { refreshKey: string }) {
       {loading && (
         <div className="mt-2 flex items-center gap-1.5 text-[11px] text-[var(--ink-400)]">
           <RefreshCw className="h-3 w-3 animate-spin text-[var(--accent-600)]" />
-          fetching from Codex…
+          fetching status…
         </div>
       )}
 
-      {!loading && (err || !data?.account) && (
+      {!loading && (err || !data) && (
         <p className="mt-1.5 text-[11px] text-[var(--ink-400)]">No data.</p>
       )}
 
-      {!loading && data?.account && (
+      {/* ── Standardized Account Panel ── */}
+      {!loading && data && (
         <>
-          <div className="mt-1.5 flex items-center gap-2">
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-sunken)] text-[var(--ink-500)]">
-              <UserIcon className="h-3 w-3" />
+          {data.account ? (
+            <div className="mt-1.5 flex items-center gap-2">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-sunken)] text-[var(--ink-500)]">
+                <UserIcon className="h-3 w-3" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[12.5px] font-medium text-[var(--ink-900)]">
+                  {data.account.name ?? data.account.email ?? "Signed in"}
+                </p>
+                <p className="truncate text-[10.5px] text-[var(--ink-500)]">
+                  {data.account.email ?? ""}
+                  {data.account.planType ? (
+                    <>
+                      {data.account.email ? " · " : ""}
+                      <span className="font-medium uppercase text-[var(--accent-700)]">
+                        {data.account.planType}
+                      </span>
+                    </>
+                  ) : null}
+                </p>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[12.5px] font-medium text-[var(--ink-900)]">
-                {data.account.name ?? data.account.email ?? "Signed in"}
-              </p>
-              <p className="truncate text-[10.5px] text-[var(--ink-500)]">
-                {data.account.email ?? ""}
-                {data.account.planType ? (
-                  <>
-                    {data.account.email ? " · " : ""}
-                    <span className="font-medium uppercase text-[var(--accent-700)]">
-                      {data.account.planType}
-                    </span>
-                  </>
-                ) : null}
-              </p>
+          ) : (
+            <div className="mt-2 flex items-center gap-2">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-sunken)] text-[var(--ink-500)]">
+                <XCircle className="h-3.5 w-3.5 text-rose-500" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[12.5px] font-medium text-[var(--ink-900)]">
+                  {data.label}
+                </p>
+                <p className="text-[10.5px] text-[var(--ink-500)]">
+                  Not authenticated
+                  {data.version ? ` · v${data.version}` : ""}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
           {data.rateLimits ? (
-            <div className="mt-2 space-y-1.5">
+            <div className="mt-4 space-y-1.5">
               <LimitRow label="5h limit" win={data.rateLimits.primary} />
               <LimitRow label="Weekly limit" win={data.rateLimits.secondary} />
             </div>
-          ) : (
-            <p className="mt-2 text-[10.5px] text-[var(--ink-400)]">
-              Usage limits unavailable.
-            </p>
-          )}
+          ) : data.account ? (
+            <div className="mt-4 text-[10.5px] text-[var(--ink-400)]">
+              Usage limits unavailable or unlimited.
+            </div>
+          ) : null}
+          
+          <div className="mt-4 flex items-center gap-2">
+            <a
+              href={data.docsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1 text-[10.5px] font-medium text-[var(--ink-700)] transition hover:border-[var(--accent-300)] hover:text-[var(--accent-700)]"
+            >
+              <ExternalLink className="h-2.5 w-2.5" />
+              {data.installed ? "Auth help" : "Install guide"}
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined" && window.getit?.runCodexSetup) {
+                  window.getit.runCodexSetup().catch(() => {});
+                }
+              }}
+              className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1 text-[10.5px] font-medium text-[var(--ink-700)] transition hover:border-[var(--accent-300)] hover:text-[var(--accent-700)]"
+            >
+              <Settings2 className="h-2.5 w-2.5" />
+              Switch provider
+            </button>
+          </div>
         </>
       )}
     </div>

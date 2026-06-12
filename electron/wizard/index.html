@@ -206,10 +206,32 @@
   <body>
     <header>
       <h1>Almost there</h1>
-      <p id="header-blurb">Sign in with the ChatGPT account you already use — that's the one Get It.'s agents run against. Your study data never leaves this Mac/PC.</p>
+      <p id="header-blurb">Select your preferred AI provider to power Get It.'s agents. Your study data never leaves this Mac/PC.</p>
     </header>
 
     <main>
+      <div class="step active" id="step-provider">
+        <div class="step-marker" id="step-provider-marker">1</div>
+        <div style="min-width: 0; flex: 1;">
+          <h2>Choose your AI Provider</h2>
+          <p id="provider-desc">Select which backend you want to use. You can change this later.</p>
+          <div class="controls" style="margin-bottom: 8px; flex-direction: column; align-items: flex-start;">
+            <label style="display: flex; align-items: center; gap: 8px;">
+              <input type="radio" name="provider" value="codex" checked> Codex CLI (OpenAI / ChatGPT)
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px;">
+              <input type="radio" name="provider" value="gemini"> Gemini CLI
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px;">
+              <input type="radio" name="provider" value="claude"> Claude Code (Anthropic)
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px;">
+              <input type="radio" name="provider" value="pi"> Bring Your Own Key (BYOK)
+            </label>
+          </div>
+        </div>
+      </div>
+
       <div class="step" id="step-install" hidden>
         <div class="step-marker" id="step-install-marker">1</div>
         <div style="min-width: 0; flex: 1;">
@@ -223,13 +245,23 @@
       </div>
 
       <div class="step" id="step-login">
-        <div class="step-marker" id="step-login-marker">1</div>
+        <div class="step-marker" id="step-login-marker">2</div>
         <div style="min-width: 0; flex: 1;">
           <h2>Sign in with ChatGPT or OpenAI</h2>
           <p id="login-desc">A browser window will open to authenticate. The same login is used by Codex itself.</p>
           <div class="controls">
             <button class="btn" id="btn-login" disabled>Sign in</button>
             <span id="login-status" class="muted"></span>
+          </div>
+          <div id="api-key-box" hidden style="margin-top: 8px;">
+            <input
+              type="password"
+              id="api-key-input"
+              placeholder="Paste your API key"
+              autocomplete="off"
+              spellcheck="false"
+              style="width: 100%; padding: 8px 10px; box-sizing: border-box;"
+            />
           </div>
           <div id="auth-url-box" class="url-fallback" hidden>
             <strong>Browser didn't open?</strong> Visit:<br />

@@ -50,6 +50,15 @@ const PLATFORM_PACKAGE_BY_TARGET = {
   "aarch64-pc-windows-msvc": "@openai/codex-win32-arm64",
 };
 
+const CLAUDE_PKG_BY_TARGET = {
+  "x86_64-unknown-linux-musl": "@anthropic-ai/claude-code-linux-x64",
+  "aarch64-unknown-linux-musl": "@anthropic-ai/claude-code-linux-arm64",
+  "x86_64-apple-darwin": "@anthropic-ai/claude-code-darwin-x64",
+  "aarch64-apple-darwin": "@anthropic-ai/claude-code-darwin-arm64",
+  "x86_64-pc-windows-msvc": "@anthropic-ai/claude-code-win32-x64",
+  "aarch64-pc-windows-msvc": "@anthropic-ai/claude-code-win32-arm64",
+};
+
 function targetTriple() {
   const { platform, arch } = process;
   if (platform === "linux" || platform === "android") {
@@ -161,6 +170,59 @@ function resolveCodexBinary() {
   if (userDataBin && fs.existsSync(userDataBin)) {
     return { path: userDataBin, source: "userdata" };
   }
+  return null;
+}
+
+function resolveBundledBinary(provider) {
+  const triple = targetTriple();
+  const isWin = process.platform === "win32";
+
+  const getSubPath = () => {
+    if (provider === "claude") {
+      return triple ? ["claude-bin", triple, "claude", isWin ? "claude.exe" : "claude"] : null;
+    }
+    return ["gemini-bin", "gemini-cli", "bundle", "gemini.js"];
+  };
+
+  const subPath = getSubPath();
+  if (!subPath) return null;
+
+  const out = [];
+  if (process.resourcesPath) {
+    out.push(
+      path.join(process.resourcesPath, "app.asar.unpacked", "electron", ...subPath),
+      path.join(process.resourcesPath, "electron", ...subPath)
+    );
+  }
+  out.push(path.join(app.getAppPath(), "electron", ...subPath));
+
+  for (const candidate of out) {
+    if (fs.existsSync(candidate)) {
+      maybeChmod(candidate);
+      return candidate;
+    }
+  }
+
+  if (provider === "claude") {
+    const pkg = triple ? CLAUDE_PKG_BY_TARGET[triple] : null;
+    if (pkg) {
+      for (const root of candidateNodeModulesRoots()) {
+        const candidate = path.join(root, pkg, isWin ? "claude.exe" : "claude");
+        if (fs.existsSync(candidate)) {
+          maybeChmod(candidate);
+          return candidate;
+        }
+      }
+    }
+  } else if (provider === "gemini") {
+    for (const root of candidateNodeModulesRoots()) {
+      const candidate = path.join(root, "@google", "gemini-cli", "bundle", "gemini.js");
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
   return null;
 }
 
@@ -350,7 +412,17 @@ function ensureIpcHandlers() {
     }
     return refreshCodexStatus();
   });
-  ipcMain.handle("wizard:login", async () => {
+  ipcMain.handle("wizard:login", async (_e, provider) => {
+    if (provider === "claude") {
+      const { exec } = require('child_process');
+      const cmd = process.platform === "win32" 
+        ? 'start cmd.exe /c "npx -y @anthropic-ai/claude-code auth login & pause"' 
+        : process.platform === "darwin" 
+        ? `osascript -e 'tell app "Terminal" to do script "npx -y @anthropic-ai/claude-code auth login"'` 
+        : `x-terminal-emulator -e 'npx -y @anthropic-ai/claude-code auth login' || gnome-terminal -- npx -y @anthropic-ai/claude-code auth login || xterm -e 'npx -y @anthropic-ai/claude-code auth login'`;
+      exec(cmd);
+      return;
+    }
     sendStatus({ phase: "logging-in", message: "Waiting for browser login…" });
     try {
       const ok = await runCodexLogin((line) => {
@@ -371,7 +443,29 @@ function ensureIpcHandlers() {
       await shell.openExternal(url).catch(() => {});
     }
   });
-  ipcMain.handle("wizard:finish", () => {
+  ipcMain.handle("wizard:finish", (_e, payload) => {
+    const override = payload && payload.provider;
+    if (override && override !== "codex") {
+      try {
+        const settingsPath = path.join(app.getPath("userData"), "settings.json");
+        let settings = { v: 2, autoGenerate: false, maxRetries: 3 };
+        if (fs.existsSync(settingsPath)) {
+          try { settings = JSON.parse(fs.readFileSync(settingsPath, "utf8")); } catch {}
+        }
+        settings.provider = override;
+        if (override !== "pi") {
+          settings.managedProvider = override;
+        }
+        if (override === "gemini" && payload.geminiApiKey) {
+          settings.geminiApiKey = payload.geminiApiKey;
+          process.env.GEMINI_API_KEY = payload.geminiApiKey;
+        }
+        fs.writeFileSync(settingsPath, JSON.stringify(settings));
+      } catch (err) {}
+      closeWizardWindow(true);
+      return refreshCodexStatus();
+    }
+
     const status = refreshCodexStatus();
     if (status.binaryFound && status.versionOk && status.loggedIn) {
       closeWizardWindow(true);
@@ -576,6 +670,166 @@ function onCodexStatusChange(cb) {
 }
 
 // ── Public: run before main window opens ────────────────────────────────
+
+/**
+ * Read the saved provider from settings.json.
+ * Falls back to "codex" if the file is missing or malformed.
+ */
+function readSavedProvider() {
+  try {
+    const settingsPath = path.join(app.getPath("userData"), "settings.json");
+    if (!fs.existsSync(settingsPath)) return "codex";
+    const raw = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+    if (raw.provider === "gemini" || raw.provider === "claude" || raw.provider === "pi") return raw.provider;
+    return "codex";
+  } catch {
+    return "codex";
+  }
+}
+
+/**
+ * Resolve a CLI binary on $PATH with augmented search paths.
+ * Returns the absolute path or null.
+ */
+function resolveCliOnPath(binaryName) {
+  const cmd = process.platform === "win32" ? "where.exe" : "which";
+  const home = os.homedir();
+  const extraPaths = [
+    "/usr/local/bin",
+    "/opt/homebrew/bin",
+    `${home}/.npm-global/bin`,
+    `${home}/.nvm/current/bin`,
+    `${home}/.local/bin`,
+  ];
+  const basePath = process.env.PATH || "";
+  const existing = new Set(basePath.split(":"));
+  const additions = extraPaths.filter((p) => !existing.has(p));
+  const augmented = additions.length ? `${basePath}:${additions.join(":")}` : basePath;
+
+  try {
+    const r = spawnSync(cmd, [binaryName], {
+      encoding: "utf8",
+      timeout: 5000,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, PATH: augmented },
+    });
+    if (r.status !== 0) return null;
+    const line = (r.stdout || "").trim().split(/\r?\n/)[0]?.trim();
+    return line || null;
+  } catch {
+    return null;
+  }
+}
+
+
+
+/**
+ * Check if a CLI binary is authenticated.
+ */
+function isCliAuthenticated(binaryPath, provider) {
+  if (provider === "claude") {
+    try {
+      const isJs = binaryPath.endsWith(".js");
+      const bin = isJs ? process.execPath : binaryPath;
+      const args = isJs ? [binaryPath, "auth", "status"] : ["auth", "status"];
+      const r = spawnSync(bin, args, {
+        encoding: "utf8",
+        timeout: 5000,
+        shell: process.platform === "win32",
+      });
+      return r.status === 0;
+    } catch {
+      return false;
+    }
+  }
+  if (provider === "gemini") {
+    // Gemini doesn't have a dedicated auth check — a successful --version
+    // is a reasonable proxy.
+    try {
+      const credsPath = path.join(os.homedir(), ".gemini", "gemini-credentials.json");
+      return fs.existsSync(credsPath);
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+const PROVIDER_DOCS = {
+  codex: "https://github.com/openai/codex#login",
+  gemini: "https://github.com/google-gemini/gemini-cli",
+  claude: "https://docs.anthropic.com/en/docs/claude-code",
+};
+
+const PROVIDER_PACKAGES = {
+  gemini: "@google/gemini-cli",
+  claude: "@anthropic-ai/claude-code",
+};
+
+const PROVIDER_LABELS = {
+  codex: "Codex CLI",
+  gemini: "Gemini CLI",
+  claude: "Claude Code",
+};
+
+/**
+ * Provider-aware setup. Reads the saved provider from settings.json
+ * and ensures the correct backend is ready:
+ *   - codex  → existing wizard flow (binary + auth)
+ *   - gemini → use bundled binary
+ *   - claude → use bundled binary
+ */
+async function ensureProviderReady() {
+  const provider = readSavedProvider();
+
+  if (provider === "codex") {
+    return ensureCodexReady();
+  }
+
+  const binPath = resolveBundledBinary(provider);
+
+  // BYOK does not require a binary.
+  if (provider === "pi") return true;
+
+  if (!binPath) {
+    const label = PROVIDER_LABELS[provider];
+    const { dialog: d } = require("electron");
+    d.showMessageBoxSync({
+      type: "error",
+      title: `${label} — Not Found`,
+      message: `${label} could not be found. Your installation may be corrupted.`,
+      buttons: ["Quit"],
+    });
+    return false;
+  }
+
+  // Check auth
+  // Both Claude and Gemini use terminal-based authentication
+  let authenticated = false;
+  if (provider === "gemini") {
+    try {
+      const settingsPath = path.join(app.getPath("userData"), "settings.json");
+      if (fs.existsSync(settingsPath)) {
+        const raw = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+        if (raw.geminiApiKey) {
+          process.env.GEMINI_API_KEY = raw.geminiApiKey;
+          authenticated = true;
+        }
+      }
+    } catch {}
+  }
+  
+  if (!authenticated && (provider === "claude" || provider === "gemini")) {
+    authenticated = isCliAuthenticated(binPath, provider);
+  }
+
+  if (!authenticated && (provider === "claude" || provider === "gemini")) {
+    return showSetupWindow({ reason: "first-run", provider });
+  }
+
+  return true;
+}
+
 async function ensureCodexReady() {
   ensureIpcHandlers();
   let status = refreshCodexStatus();
@@ -583,6 +837,12 @@ async function ensureCodexReady() {
     return true;
   }
   const ok = await showSetupWindow({ reason: "first-run" });
+  
+  const newProvider = readSavedProvider();
+  if (newProvider !== "codex") {
+    return await ensureProviderReady();
+  }
+
   status = refreshCodexStatus();
   // Even if the wizard returned, only proceed if every gate is green.
   return ok && status.binaryFound && status.versionOk && status.loggedIn;
@@ -590,8 +850,11 @@ async function ensureCodexReady() {
 
 module.exports = {
   ensureCodexReady,
+  ensureProviderReady,
   showSetupWindow,
   resolveCodexBinary,
   refreshCodexStatus,
   onCodexStatusChange,
+  readSavedProvider,
+  resolveBundledBinary,
 };

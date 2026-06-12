@@ -12,9 +12,7 @@
   "private": true,
   "main": "electron/main.js",
   "scripts": {
-    "dev": "npm run cleanup && npm run build && npm run electron:prepare && cross-env ELECTRON_RUN_AS_NODE= ELECTRON_NO_ATTACH_CONSOLE= electron .",
-    "browser:dev": "next dev",
-    "dev:hmr": "concurrently -k -n next,electron -c blue,magenta \"npm run browser:dev\" \"wait-on http://127.0.0.1:3000 && cross-env ELECTRON_RUN_AS_NODE= ELECTRON_NO_ATTACH_CONSOLE= ELECTRON_DEV_URL=http://127.0.0.1:3000 electron .\"",
+    "dev": "npm run cleanup && npm run build && npm run electron:prepare && node scripts/launch.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -33,6 +31,9 @@
     "build:desktop:all": "node scripts/build-electron.mjs --all"
   },
   "dependencies": {
+    "@anthropic-ai/claude-code": "^2.1.170",
+    "@earendil-works/pi-coding-agent": "^0.79.1",
+    "@google/gemini-cli": "^0.45.3",
     "@openai/codex-sdk": "^0.130.0",
     "@tailwindcss/typography": "^0.5.19",
     "clsx": "^2.1.1",

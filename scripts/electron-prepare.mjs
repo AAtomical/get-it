@@ -40,6 +40,7 @@ const args = process.argv.slice(2);
 const target = args.find((a) => a.startsWith("--target="))?.split("=")[1] ?? null;
 
 const REQUIRED_CODEX_VERSION = process.env.CODEX_VERSION || "0.130.0";
+const REQUIRED_CLAUDE_VERSION = process.env.CLAUDE_VERSION || "2.1.169";
 
 const PLATFORM_PKG_BY_TARGET = {
   "darwin-arm64": "@openai/codex-darwin-arm64",
@@ -48,6 +49,15 @@ const PLATFORM_PKG_BY_TARGET = {
   "win32-arm64": "@openai/codex-win32-arm64",
   "linux-x64": "@openai/codex-linux-x64",
   "linux-arm64": "@openai/codex-linux-arm64",
+};
+
+const CLAUDE_PKG_BY_TARGET = {
+  "darwin-arm64": "@anthropic-ai/claude-code-darwin-arm64",
+  "darwin-x64": "@anthropic-ai/claude-code-darwin-x64",
+  "win32-x64": "@anthropic-ai/claude-code-win32-x64",
+  "win32-arm64": "@anthropic-ai/claude-code-win32-arm64",
+  "linux-x64": "@anthropic-ai/claude-code-linux-x64",
+  "linux-arm64": "@anthropic-ai/claude-code-linux-arm64",
 };
 
 async function copyDir(src, dest) {
@@ -98,8 +108,14 @@ async function syncStandaloneAssets() {
   const dstWatch = path.join(STANDALONE, "server-watchdog.cjs");
   await fs.copyFile(srcWatch, dstWatch);
 
+  // Pi Coding Agent CLI needs all its files (like config.js) in standalone
+  const srcPi = path.join(REPO_ROOT, "node_modules", "@earendil-works", "pi-coding-agent");
+  const dstPi = path.join(STANDALONE, "node_modules", "@earendil-works", "pi-coding-agent");
+  await fs.rm(dstPi, { recursive: true, force: true });
+  await copyDir(srcPi, dstPi);
+
   console.log(
-    "[electron-prepare] copied .next/static, public, and server-watchdog into standalone.",
+    "[electron-prepare] copied .next/static, public, server-watchdog, and pi-coding-agent into standalone.",
   );
 }
 
@@ -239,6 +255,71 @@ async function fetchPlatformPackage(targetTriple) {
   console.log(`[electron-prepare] staged codex binary at electron/codex-bin/${triple}/codex/${exeName}`);
 }
 
+async function fetchClaudePackage(targetTriple) {
+  const pkg = CLAUDE_PKG_BY_TARGET[targetTriple];
+  const triple = tripleDirFor(targetTriple);
+  if (!pkg || !triple) {
+    console.warn(`[electron-prepare] unknown target ${targetTriple}, skipping claude fetch.`);
+    return;
+  }
+  const nmDest = path.join(REPO_ROOT, "node_modules", pkg);
+  const haveLocally =
+    fssync.existsSync(path.join(nmDest, "package.json")) &&
+    (fssync.existsSync(path.join(nmDest, "claude")) || fssync.existsSync(path.join(nmDest, "claude.exe")));
+  if (!haveLocally) {
+    const url = `https://registry.npmjs.org/${pkg}/-/${pkg.split('/')[1]}-${REQUIRED_CLAUDE_VERSION}.tgz`;
+    console.log(`[electron-prepare] fetching ${url}…`);
+    const gz = await downloadBuffer(url);
+    const tar = zlib.gunzipSync(gz);
+    await fs.rm(nmDest, { recursive: true, force: true });
+    await fs.mkdir(nmDest, { recursive: true });
+    extractTar(tar, nmDest, true);
+    console.log(`[electron-prepare] installed ${pkg} for ${targetTriple}.`);
+  } else {
+    console.log(`[electron-prepare] ${pkg} already present.`);
+  }
+
+  const exeName = targetTriple.startsWith("win32-") ? "claude.exe" : "claude";
+  const claudeBinRoot = path.join(REPO_ROOT, "electron", "claude-bin");
+  
+  if (fssync.existsSync(claudeBinRoot)) {
+    for (const entry of fssync.readdirSync(claudeBinRoot)) {
+      if (entry !== triple) {
+        fssync.rmSync(path.join(claudeBinRoot, entry), { recursive: true, force: true });
+      }
+    }
+  }
+  const destVendor = path.join(claudeBinRoot, triple, "claude");
+  await fs.rm(destVendor, { recursive: true, force: true });
+  await fs.mkdir(destVendor, { recursive: true });
+  
+  const srcBin = path.join(nmDest, exeName);
+  const destBin = path.join(destVendor, exeName);
+  await fs.copyFile(srcBin, destBin);
+  
+  if (!targetTriple.startsWith("win32-")) {
+    try {
+      fssync.chmodSync(destBin, 0o755);
+    } catch {
+      /* ignore */
+    }
+  }
+  console.log(`[electron-prepare] staged claude binary at electron/claude-bin/${triple}/claude/${exeName}`);
+}
+
+async function stageGeminiCLI() {
+  const nmDest = path.join(REPO_ROOT, "node_modules", "@google", "gemini-cli");
+  if (!fssync.existsSync(nmDest)) {
+    console.warn("[electron-prepare] gemini-cli not found in node_modules, skipping.");
+    return;
+  }
+  const geminiBinRoot = path.join(REPO_ROOT, "electron", "gemini-bin");
+  await fs.rm(geminiBinRoot, { recursive: true, force: true });
+  await fs.mkdir(geminiBinRoot, { recursive: true });
+  await copyDir(nmDest, path.join(geminiBinRoot, "gemini-cli"));
+  console.log(`[electron-prepare] staged gemini cli at electron/gemini-bin/gemini-cli`);
+}
+
 function hostTarget() {
   const { platform, arch } = process;
   if (platform === "darwin") return arch === "arm64" ? "darwin-arm64" : "darwin-x64";
@@ -255,7 +336,9 @@ async function main() {
   const effective = target || hostTarget();
   if (effective) {
     await fetchPlatformPackage(effective);
+    await fetchClaudePackage(effective);
   }
+  await stageGeminiCLI();
 }
 
 main().catch((err) => {

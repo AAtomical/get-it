@@ -92,6 +92,7 @@ function mergeTagsFile(
 // ── Detection job ───────────────────────────────────────────────────────
 
 const detectionInFlight = new Map<string, Promise<void>>();
+const detectionErrors = new Map<string, string>();
 
 export function isDetectionRunning(docId: string): boolean {
   return detectionInFlight.has(docId);
@@ -173,12 +174,9 @@ async function runDetection(docId: string) {
             } else {
               // Generic failure: count it against every page in the batch and
               // give up on those that hit the cap so we don't loop forever.
-              console.warn(
-                "[jobs/detect-batch]",
-                docId,
-                batch.join(","),
-                e instanceof Error ? e.message : e,
-              );
+              const msg = e instanceof Error ? e.message : String(e);
+              console.warn("[jobs/detect-batch]", docId, batch.join(","), msg);
+              detectionErrors.set(docId, msg);
               for (const p of batch) {
                 const n = (attempts.get(p) ?? 0) + 1;
                 attempts.set(p, n);
@@ -239,6 +237,7 @@ async function analyzeBatch(
   if (rich.length === 0) return;
 
   const richSet = new Set(rich.map((r) => r.pageIndex));
+  detectionErrors.delete(docId); // Reset prior errors on fresh run
   const result = await detectConceptsForPages(rich);
 
   // Route each concept back to its page; drop any the model mis-tagged with a
@@ -347,19 +346,16 @@ export function requestVizGeneration(
   tagId: string,
   runtimeError?: string,
 ): void {
-  const settings = loadSettings();
-  const maxRetries = settings.maxRetries;
   mergeTagsFile(docId, (file) => ({
     ...file,
     tags: file.tags.map((t) => {
       if (t.id !== tagId) return t;
-      const attemptsSoFar = t.attempts ?? 0;
-      if (runtimeError && attemptsSoFar > maxRetries) {
+      if (runtimeError) {
         return {
           ...t,
           ready: false,
           generating: false,
-          error: `Couldn't render this concept — the agent's code kept failing to compile after ${attemptsSoFar} attempts.`,
+          error: runtimeError,
           lastRuntimeError: runtimeError,
         };
       }
@@ -368,11 +364,30 @@ export function requestVizGeneration(
         ready: false,
         generating: true,
         error: undefined,
-        lastRuntimeError: runtimeError ?? t.lastRuntimeError,
+        lastRuntimeError: undefined,
       };
     }),
   }));
   ensureVizQueue(docId);
+}
+
+export function requestRetryFailedViz(docId: string): number {
+  let requeued = 0;
+  mergeTagsFile(docId, (file) => ({
+    ...file,
+    tags: file.tags.map((t) => {
+      if (!t.error) return t;
+      requeued++;
+      return {
+        ...t,
+        ready: false,
+        generating: true,
+        error: undefined,
+      };
+    }),
+  }));
+  if (requeued > 0) ensureVizQueue(docId);
+  return requeued;
 }
 
 async function runVizQueue(docId: string) {
@@ -528,9 +543,11 @@ async function processViz(docId: string, tagId: string, docTitle: string) {
 export function getJobStatus(docId: string): {
   detectionRunning: boolean;
   vizQueueRunning: boolean;
+  detectionError?: string;
 } {
   return {
     detectionRunning: isDetectionRunning(docId),
     vizQueueRunning: isVizQueueRunning(docId),
+    detectionError: detectionErrors.get(docId),
   };
 }

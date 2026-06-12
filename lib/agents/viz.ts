@@ -10,14 +10,15 @@
  *   • If a previous attempt is supplied with its runtime error, prepends
  *     a repair preamble (the codex SDK gets `reasoning: "medium"` for
  *     these to spend a little extra thought).
- *   • Server-side syntax pre-flight via `new Function(...)` for the two
- *     code-emitting types (3D, 2d-anim): if the LLM truncated mid-
- *     expression or otherwise produced broken JS, we silently repair
- *     ONCE before returning, so the user never sees that round trip.
+ *   • Server-side syntax pre-flight (via the same `compileFn` the client
+ *     runtime uses) for the two code-emitting types (3D, 2d-anim): if the
+ *     generated JS doesn't compile, we throw with the compiler's reason so
+ *     the failure is surfaced to the user (single-attempt — no auto-repair).
  */
 
 import { runJson } from "../codex";
 import { vizSchemaFor, type VizSpec, type VizType } from "../schemas";
+import { compileFn } from "../viz-runtime";
 
 const LANGUAGE_RULE = `LANGUAGE
 The "context" field comes verbatim from the source PDF and reveals its
@@ -71,7 +72,8 @@ CONSTRAINTS:
   - Material colors should read clearly against #fafafa (avoid pure white
     surfaces; prefer mid-tone fills with subtle MeshStandardMaterial).
   - Every '(' must close with ')', every '{' with '}', every '[' with ']'.
-    The body must end with the closing brace of its outermost function.`,
+    The body is NOT wrapped in an outer function, so do NOT add a trailing
+    '}' to "close" one — your braces must balance exactly on their own.`,
 
   "2d-anim": `You are Get It.'s visualizer 2D Canvas animation generator.
 
@@ -109,9 +111,12 @@ CONSTRAINTS:
   - Use only 'ctx' (CanvasRenderingContext2D) plus Math globals.
   - Restart the animation cleanly when 'time' resets to 0.
   - Use plain string concatenation ('foo ' + x) NOT template literals
-    (\`foo \${x}\`) — backticks tend to get mangled in JSON encoding.`,
+    (\`foo \${x}\`) — backticks tend to get mangled in JSON encoding.
+  - Every '(' must close with ')', every '{' with '}', every '[' with ']'.
+    The body is NOT wrapped in an outer function, so do NOT add a trailing
+    '}' to "close" one — your braces must balance exactly on their own.`,
 
-  formula: `You are Get It.'s visualizer formula generator.
+  formula: `You are Get It's visualizer formula generator.
 
 ${LANGUAGE_RULE}
 
@@ -192,8 +197,10 @@ from scratch unless the original direction is fundamentally broken.
 
 function syntaxCheck(code: string): string | null {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
-    new Function("api", code);
+    // Compile exactly the way the client runtime will (same fence-stripping,
+    // strict-mode IIFE wrap and forbidden-global shadowing) so the server-side
+    // check matches reality — no false rejections, no missed strict errors.
+    compileFn(code);
     return null;
   } catch (e) {
     return (e as Error).message || "syntax error";
@@ -228,33 +235,19 @@ export async function generateVizSpec(args: GenerateVizArgs): Promise<VizSpec> {
   const reasoning = args.previousAttempt ? "medium" : "low";
   const webSearch = args.type === "2d-text";
 
-  let { data } = await runJson<VizSpec>(initialPrompt, schema, {
+  const { data } = await runJson<VizSpec>(initialPrompt, schema, {
     reasoning,
     webSearch,
     signal: args.signal,
   });
 
-  // Server-side syntax pre-flight for code-emitting types — silent repair
-  // if the model truncated mid-expression or produced broken JS.
+  // Single-attempt policy: validate the generated code once. If it doesn't
+  // compile, surface the reason immediately (no silent repair round) so the
+  // failure is shown to the user, who can refresh to try again.
   const code = specCodeOrNull(data);
   if (code) {
     const err = syntaxCheck(code);
-    if (err) {
-      const repairPrompt = repairPreamble(data, err) + basePrompt;
-      try {
-        const { data: fixed } = await runJson<VizSpec>(repairPrompt, schema, {
-          reasoning: "medium",
-          webSearch: false,
-          signal: args.signal,
-        });
-        const fixedCode = specCodeOrNull(fixed);
-        if (fixedCode && !syntaxCheck(fixedCode)) {
-          data = fixed;
-        }
-      } catch {
-        /* let client retry budget handle it */
-      }
-    }
+    if (err) throw new Error(`Generated code failed to compile: ${err}`);
   }
 
   return data;

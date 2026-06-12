@@ -107,6 +107,7 @@ type Props = {
   docId: string;
   mode: RightPaneMode;
   onModeChange: (m: RightPaneMode) => void;
+  providerLabel?: string;
   // Visualizer-only props (forwarded as-is from the orchestrator)
   visualizer: {
     spec: VizSpec | null;
@@ -119,7 +120,7 @@ type Props = {
   };
 };
 
-export default function RightPane({ docId, mode, onModeChange, visualizer }: Props) {
+export default function RightPane({ docId, mode, onModeChange, visualizer, providerLabel }: Props) {
   return (
     <div className="flex h-full flex-col bg-white">
       <Header
@@ -137,11 +138,13 @@ export default function RightPane({ docId, mode, onModeChange, visualizer }: Pro
             emptyHint={visualizer.emptyHint}
             loadingDetail={visualizer.loadingDetail}
             onRuntimeError={visualizer.onRuntimeError}
+            providerLabel={providerLabel}
           />
         )}
         {mode === "graph" && (
           <KnowledgeGraphView
             docId={docId}
+            providerLabel={providerLabel}
             onJumpToTool={(tool, topic) => {
               onModeChange(tool);
               // Pre-fill is handled inside each tool via sessionStorage hint.
@@ -407,12 +410,14 @@ function VisualizerBody({
   emptyHint,
   loadingDetail,
   onRuntimeError,
+  providerLabel,
 }: {
   spec: VizSpec | null;
   loading: boolean;
   emptyHint?: string;
   loadingDetail?: string;
   onRuntimeError?: (msg: string) => void;
+  providerLabel?: string;
 }) {
   return (
     <AnimatePresence mode="wait">
@@ -430,7 +435,7 @@ function VisualizerBody({
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--ink-400)] [animation-delay:150ms]" />
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--ink-400)] [animation-delay:300ms]" />
             </div>
-            <p className="text-xs">codex is composing the visualization</p>
+            <p className="text-xs">{providerLabel ?? "Codex CLI"} is composing the visualization</p>
             {loadingDetail && <p className="text-[11px] text-[var(--ink-400)]">{loadingDetail}</p>}
           </div>
         </motion.div>

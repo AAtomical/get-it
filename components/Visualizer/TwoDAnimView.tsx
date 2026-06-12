@@ -84,6 +84,8 @@ export default function TwoDAnimView({ spec, onRuntimeError }: Props) {
     };
     raf = requestAnimationFrame(tick);
 
+
+
     const ro = new ResizeObserver(resize);
     ro.observe(container);
 

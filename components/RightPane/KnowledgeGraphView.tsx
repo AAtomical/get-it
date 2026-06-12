@@ -28,9 +28,10 @@ type Props = {
    * concept"). Lets the right pane switch mode and jump straight in.
    */
   onJumpToTool?: (tool: "chat" | "flashcards" | "quizzes" | "feynman", topic: string) => void;
+  providerLabel?: string;
 };
 
-export default function KnowledgeGraphView({ docId, onJumpToTool }: Props) {
+export default function KnowledgeGraphView({ docId, onJumpToTool, providerLabel }: Props) {
   const [kg, setKg] = useState<KnowledgeGraph | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -101,7 +102,7 @@ export default function KnowledgeGraphView({ docId, onJumpToTool }: Props) {
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--ink-400)] [animation-delay:300ms]" />
         </div>
         <p className="text-[12.5px] text-[var(--ink-500)]">
-          codex is mapping the document&apos;s concept graph
+          {providerLabel ?? "Codex CLI"} is mapping the document&apos;s concept graph
         </p>
         <p className="text-[10.5px] text-[var(--ink-400)]">
           this runs once per document, in parallel with concept detection

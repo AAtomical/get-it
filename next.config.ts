@@ -34,6 +34,7 @@ const nextConfig: NextConfig = {
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
       "./node_modules/@openai/codex/bin/codex.js",
+      "./node_modules/@earendil-works/pi-coding-agent/**/*",
     ],
   },
   // Keep the tracer out of paths the Next.js server never needs at

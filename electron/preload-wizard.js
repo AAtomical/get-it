@@ -5,9 +5,9 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("wizard", {
   status: () => ipcRenderer.invoke("wizard:status"),
   install: () => ipcRenderer.invoke("wizard:install"),
-  login: () => ipcRenderer.invoke("wizard:login"),
+  login: (provider) => ipcRenderer.invoke("wizard:login", provider),
   openUrl: (url) => ipcRenderer.invoke("wizard:open-url", url),
-  finish: () => ipcRenderer.invoke("wizard:finish"),
+  finish: (payload) => ipcRenderer.invoke("wizard:finish", payload),
   cancel: () => ipcRenderer.invoke("wizard:cancel"),
   onStatus: (cb) => {
     const wrapped = (_e, s) => cb(s);
