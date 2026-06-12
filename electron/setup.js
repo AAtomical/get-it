@@ -423,9 +423,9 @@ function ensureIpcHandlers() {
       const isJs = binPath.endsWith(".js");
       const cmdBin = isJs ? `"${process.execPath}" "${binPath}"` : `"${binPath}"`;
       const cmd = process.platform === "win32" 
-        ? `start cmd.exe /c "${isJs ? `""${process.execPath}" "${binPath}""` : `""${binPath}""`} auth login & pause"` 
+        ? `start cmd.exe /c ""${cmdBin} auth login & pause""` 
         : process.platform === "darwin" 
-        ? `osascript -e 'tell app "Terminal" to do script "${cmdBin} auth login"'` 
+        ? `osascript -e 'tell app "Terminal" to do script "${cmdBin.replace(/"/g, '\\"')} auth login"'` 
         : `x-terminal-emulator -e '${cmdBin} auth login' || gnome-terminal -- ${cmdBin} auth login || xterm -e '${cmdBin} auth login'`;
       exec(cmd);
       return;
