@@ -82,6 +82,7 @@
     },
     "afterSign": "scripts/electron-after-sign.cjs",
     "afterPack": "scripts/electron-after-pack.cjs",
+    "npmRebuild": false,
     "asar": false,
     "files": [
       "electron/**/*",
