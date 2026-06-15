@@ -104,8 +104,13 @@ export function saveDoc(entry: StoreEntry): void {
     uploadedAt: entry.uploadedAt,
     numPages: entry.numPages,
   };
-  fs.writeFileSync(metaPath(entry.id), JSON.stringify(meta, null, 2));
-  fs.writeFileSync(extractedPath(entry.id), JSON.stringify(entry.extracted));
+  const writeAtomic = (p: string, data: unknown) => {
+    const tmp = `${p}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(data));
+    fs.renameSync(tmp, p);
+  };
+  writeAtomic(extractedPath(entry.id), entry.extracted);
+  writeAtomic(metaPath(entry.id), meta);
   upsertIndex(meta);
   store.set(entry.id, entry);
 }

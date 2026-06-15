@@ -110,81 +110,74 @@ export async function buildKG(docId: string): Promise<KnowledgeGraph> {
   const inFlight = buildInFlight.get(docId);
   if (inFlight) return inFlight;
 
-  const promise = (async () => {
-    const doc = getDoc(docId);
-    if (!doc) throw new Error("doc not found");
-
-    // Mark as building so the client UI can show a placeholder.
-    const placeholder: KnowledgeGraph = {
-      ...emptyKG(docId),
-      status: "building",
-    };
-    saveKG(placeholder);
-
-    try {
-      const blobs = packPages(doc.extracted.pages);
-      const prompt = buildPrompt(doc.filename, blobs);
-      const { data } = await runJson<KGBuildResult>(prompt, kgBuildSchema, {
-        reasoning: "medium",
-      });
-
-      // Drop edges referencing unknown ids — the model occasionally invents one.
-      const ids = new Set(data.nodes.map((n) => n.id));
-      const cleanEdges = data.edges.filter(
-        (e) => ids.has(e.source) && ids.has(e.target) && e.source !== e.target,
-      );
-      // Dedup by (source,target).
-      const seen = new Set<string>();
-      const dedupedEdges = cleanEdges.filter((e) => {
-        const k = `${e.source}→${e.target}`;
-        if (seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      });
-
-      const nodes: KGNode[] = data.nodes.map((n) => ({
-        id: n.id,
-        label: n.label,
-        summary: n.summary,
-        pageHints: n.pageHints,
-        evaluation: { memory: 0, comprehension: 0, structure: 0, application: 0 },
-        evaluatorNote: "",
-      }));
-
-      const kg: KnowledgeGraph = {
-        v: 1,
-        docId,
-        status: "ready",
-        buildAt: Date.now(),
-        lastEvaluatedAt: null,
-        evaluationCount: 0,
-        nodes,
-        edges: dedupedEdges,
-        globalNote: data.globalNote,
-      };
-      saveKG(kg);
-      return kg;
-    } catch (e) {
-      // Any failure — an account-level Codex error (rate-limit / auth / binary
-      // / unsupported model) or a one-off — moves the graph to an `error`
-      // state carrying the reason, so the KG view drops its spinner and shows
-      // its Retry button. We never auto-retry: the user rebuilds on demand and
-      // the health banner explains an account-level failure in the meantime.
-      const errored: KnowledgeGraph = {
-        ...placeholder,
-        status: "error",
-        buildError: (e as Error).message,
-      };
-      saveKG(errored);
-      throw e;
-    }
-  })();
-
+  const promise = startBuild(docId);
   buildInFlight.set(docId, promise);
   promise.finally(() => {
     buildInFlight.delete(docId);
-  });
+  }).catch(() => {});
   return promise;
+}
+
+async function startBuild(docId: string): Promise<KnowledgeGraph> {
+  const doc = getDoc(docId);
+  if (!doc) throw new Error("doc not found");
+
+  const placeholder: KnowledgeGraph = {
+    ...emptyKG(docId),
+    status: "building",
+  };
+  saveKG(placeholder);
+
+  try {
+    const blobs = packPages(doc.extracted.pages);
+    const prompt = buildPrompt(doc.filename, blobs);
+    const { data } = await runJson<KGBuildResult>(prompt, kgBuildSchema, {
+      reasoning: "medium",
+    });
+
+    const ids = new Set(data.nodes.map((n) => n.id));
+    const cleanEdges = data.edges.filter(
+      (e) => ids.has(e.source) && ids.has(e.target) && e.source !== e.target,
+    );
+    const seen = new Set<string>();
+    const dedupedEdges = cleanEdges.filter((e) => {
+      const k = `${e.source}→${e.target}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+
+    const nodes: KGNode[] = data.nodes.map((n) => ({
+      id: n.id,
+      label: n.label,
+      summary: n.summary,
+      pageHints: n.pageHints,
+      evaluation: { memory: 0, comprehension: 0, structure: 0, application: 0 },
+      evaluatorNote: "",
+    }));
+
+    const kg: KnowledgeGraph = {
+      v: 1,
+      docId,
+      status: "ready",
+      buildAt: Date.now(),
+      lastEvaluatedAt: null,
+      evaluationCount: 0,
+      nodes,
+      edges: dedupedEdges,
+      globalNote: data.globalNote,
+    };
+    saveKG(kg);
+    return kg;
+  } catch (e) {
+    const errored: KnowledgeGraph = {
+      ...placeholder,
+      status: "error",
+      buildError: (e as Error).message,
+    };
+    saveKG(errored);
+    throw e;
+  }
 }
 
 // ── Evaluation ────────────────────────────────────────────────────────

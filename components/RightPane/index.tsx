@@ -170,13 +170,13 @@ export default function RightPane({ docId, mode, onModeChange, visualizer }: Pro
         </footer>
       )}
       {mode === "visualizer" && visualizer.activeTagError && (
-        <div className="flex shrink-0 items-start justify-between gap-3 border-t border-amber-200 bg-amber-50 px-5 py-3">
-          <p className="text-[12px] text-amber-800">{visualizer.activeTagError}</p>
+        <div className="flex shrink-0 items-start justify-between gap-3 border-t border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-5 py-3">
+          <p className="text-[12px] text-[var(--ink-700)]">{visualizer.activeTagError}</p>
           {visualizer.onRetry && (
             <button
               type="button"
               onClick={visualizer.onRetry}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-amber-300 bg-[var(--surface-raised)] px-2.5 py-1 text-[12px] font-medium text-amber-800 transition hover:bg-amber-100"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2.5 py-1 text-[12px] font-medium text-[var(--ink-700)] transition hover:bg-[var(--surface-sunken)]"
             >
               <RefreshCw className="h-3 w-3" /> Retry
             </button>

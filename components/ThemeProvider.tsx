@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 import { SETTINGS_EVENT } from "@/components/SettingsButton";
 
 function applyTheme(theme: string | undefined) {
@@ -9,32 +9,27 @@ function applyTheme(theme: string | undefined) {
   } else if (theme === "light") {
     document.documentElement.classList.remove("dark");
   } else {
-    // Follow system preference.
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     document.documentElement.classList.toggle("dark", prefersDark);
   }
 }
 
-export default function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const appliedRef = useRef(false);
-
-  const sync = useCallback(() => {
+export default function ThemeProvider({
+  children,
+  initialTheme,
+}: {
+  children: React.ReactNode;
+  initialTheme?: "light" | "dark";
+}) {
+  // No async fetch needed — the root layout sets the class during SSR and a
+  // blocking inline script handles the system-preference fallback. This
+  // component only reacts to live custom events and system preference changes.
+  const reapply = useCallback(() => {
     fetch("/api/settings", { cache: "no-store" })
       .then((r) => r.json())
-      .then((s: { theme?: string }) => {
-        applyTheme(s.theme);
-        appliedRef.current = true;
-      })
-      .catch(() => {
-        // Fall back to system preference on error.
-        applyTheme(undefined);
-        appliedRef.current = true;
-      });
+      .then((s: { theme?: string }) => applyTheme(s.theme))
+      .catch(() => applyTheme(undefined));
   }, []);
-
-  useEffect(() => {
-    sync();
-  }, [sync]);
 
   // Listen for live changes from the settings popover.
   useEffect(() => {
@@ -51,10 +46,18 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   // Re-evaluate when system preference changes (only matters when no explicit theme).
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => sync();
+    const onChange = () => {
+      if (!initialTheme) {
+        applyTheme(undefined);
+      } else {
+        // Explicit theme is set — the class won't change from system preference,
+        // but we sync from the server in case another window changed it.
+        reapply();
+      }
+    };
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
-  }, [sync]);
+  }, [initialTheme, reapply]);
 
   return <>{children}</>;
 }

@@ -346,30 +346,38 @@ function Bubble({
           content
         ) : (
           <ReactMarkdown
+            disallowedElements={["img"]}
             components={{
               p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
               ul: ({ children }) => <ul className="mb-1 list-disc pl-4 last:mb-0">{children}</ul>,
               ol: ({ children }) => <ol className="mb-1 list-decimal pl-4 last:mb-0">{children}</ol>,
               li: ({ children }) => <li className="mb-0.5 last:mb-0">{children}</li>,
+              pre: ({ children }) => (
+                <pre className="mb-2 mt-1 overflow-x-auto rounded-md bg-[var(--border-subtle)] p-3 last:mb-0">
+                  {children}
+                </pre>
+              ),
               code: ({ className, children, ...props }) => {
-                const isInline = !className;
+                const text = String(children);
+                const isInline = !className && !text.includes("\n");
                 return isInline ? (
-                  <code className="rounded bg-black/10 px-1 py-0.5 text-[12px]" {...props}>
+                  <code className="rounded bg-[var(--border-subtle)] px-1 py-0.5 text-[12px]" {...props}>
                     {children}
                   </code>
                 ) : (
-                  <pre className="mb-2 mt-1 overflow-x-auto rounded-md bg-black/10 p-3 last:mb-0">
-                    <code className={`${className} text-[12px]`} {...props}>
-                      {children}
-                    </code>
-                  </pre>
+                  <code className={`${className ?? ""} text-[12px]`} {...props}>
+                    {children}
+                  </code>
                 );
               },
-              a: ({ children, href }) => (
-                <a href={href} className="underline underline-offset-2 hover:opacity-80" target="_blank" rel="noreferrer">
-                  {children}
-                </a>
-              ),
+              a: ({ children, href }) => {
+                const safe = href && /^https?:\/\//i.test(href) ? href : undefined;
+                return (
+                  <a href={safe} className="underline underline-offset-2 hover:opacity-80" target="_blank" rel="noreferrer">
+                    {children}
+                  </a>
+                );
+              },
               strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
             }}
           >

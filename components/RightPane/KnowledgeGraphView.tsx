@@ -36,15 +36,17 @@ export default function KnowledgeGraphView({ docId, onJumpToTool }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [building, setBuilding] = useState(false);
 
-  const fetchState = useCallback(async () => {
+  const fetchState = useCallback(async (): Promise<KnowledgeGraph | null> => {
     try {
       const r = await fetch(`/api/kg/${docId}/state`, { cache: "no-store" });
       if (!r.ok) throw new Error(`state ${r.status}`);
       const j = (await r.json()) as KnowledgeGraph;
       setKg(j);
       setLoadError(null);
+      return j;
     } catch (e) {
       setLoadError((e as Error).message);
+      return null;
     }
   }, [docId]);
 
@@ -52,11 +54,9 @@ export default function KnowledgeGraphView({ docId, onJumpToTool }: Props) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      await fetchState();
-      if (cancelled) return;
-      const r = await fetch(`/api/kg/${docId}/state`).then((x) => x.json());
-      if (cancelled) return;
-      if (r.status === "missing") {
+      const initial = await fetchState();
+      if (cancelled || !initial) return;
+      if (initial.status === "missing") {
         setBuilding(true);
         try {
           await fetch(`/api/kg/${docId}/build`, { method: "POST" });

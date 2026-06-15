@@ -35,7 +35,8 @@ export default function ThreeDView({ spec, onRuntimeError }: Props) {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(width, height);
-    renderer.setClearColor("#ffffff", 1);
+    const isDark = document.documentElement.classList.contains("dark");
+    renderer.setClearColor(isDark ? "#1a1a1f" : "#ffffff", 1);
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();

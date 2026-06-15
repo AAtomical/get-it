@@ -197,17 +197,18 @@ export default function CodexHealthBanner() {
         "You've hit your usage quota. Try again later — your work is saved.";
     }
   } else {
-    icon = <AlertTriangle className="h-4 w-4 text-amber-600" />;
+    icon = <AlertTriangle className="h-4 w-4 text-[var(--tag-amber-fg)]" />;
     title = "Last Codex call failed";
     body = view.message ?? "Unknown error. Try again.";
   }
 
-  const palette =
+  const isCritical =
     view.kind === "auth_lost" ||
     view.kind === "binary_missing" ||
-    view.kind === "model_unsupported"
-      ? "border-rose-200 bg-rose-50 text-rose-900"
-      : "border-amber-200 bg-amber-50 text-amber-900";
+    view.kind === "model_unsupported";
+  const palette = isCritical
+    ? "border-[var(--feedback-wrong-border)] bg-[var(--feedback-wrong-bg)] text-[var(--feedback-wrong-text)]"
+    : "border-[var(--tag-amber-ring)] bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)]";
 
   return (
     <div

@@ -33,7 +33,10 @@ export function loadKG(docId: string): KnowledgeGraph | null {
 
 export function saveKG(kg: KnowledgeGraph): void {
   ensureDocDir(kg.docId);
-  fs.writeFileSync(kgPath(kg.docId), JSON.stringify(kg, null, 2));
+  const path = kgPath(kg.docId);
+  const tmp = `${path}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(kg, null, 2));
+  fs.renameSync(tmp, path);
 }
 
 export function emptyKG(docId: string): KnowledgeGraph {

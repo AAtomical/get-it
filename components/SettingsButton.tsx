@@ -118,7 +118,6 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
   }, [refreshKey]);
 
   const persist = useCallback((delta: Partial<SettingsPayload>) => {
-    if (!hydratedRef.current) return;
     void fetch("/api/settings", {
       method: "POST",
       headers: { "content-type": "application/json" },

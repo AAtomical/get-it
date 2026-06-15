@@ -32,6 +32,7 @@ export async function POST(req: Request) {
         ? b.maxRetries
         : current.maxRetries,
   };
+  next.theme = current.theme;
   if (b.theme === "light" || b.theme === "dark") {
     next.theme = b.theme;
   } else if (b.theme === null) {

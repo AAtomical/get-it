@@ -6,8 +6,9 @@
  */
 
 // "import" is a reserved word and can't be used as a parameter name; it's
-// a syntax error to call it as a function anyway. Same for `eval` in strict
-// mode of new Function bodies — but it's still a useful shadow there.
+// a syntax error to call it as a function anyway. eval and Function are
+// shadowed here, and the constructor-chain escape is blocked by nulling
+// Function.prototype.constructor before the model code runs (restored in finally).
 const FORBIDDEN = [
   "window",
   "document",
@@ -16,6 +17,7 @@ const FORBIDDEN = [
   "WebSocket",
   "require",
   "Function",
+  "eval",
   "globalThis",
   "self",
   "process",
@@ -44,19 +46,25 @@ export function compileFn(body: string): CompiledFn {
   // any `const THREE = ...` the model emits lives in its own scope and
   // shadows the outer binding instead of colliding with it.
   const wrapped = `
-    const THREE = api.THREE;
-    const scene = api.scene;
-    const camera = api.camera;
-    const renderer = api.renderer;
-    const controls = api.controls;
-    const group = api.group;
-    const ctx = api.ctx;
-    const width = api.width;
-    const height = api.height;
-    return (function () {
-      "use strict";
-      ${cleaned}
-    })();
+    const __origFunc = {}.constructor.constructor;
+    __origFunc.prototype.constructor = void 0;
+    try {
+      const THREE = api.THREE;
+      const scene = api.scene;
+      const camera = api.camera;
+      const renderer = api.renderer;
+      const controls = api.controls;
+      const group = api.group;
+      const ctx = api.ctx;
+      const width = api.width;
+      const height = api.height;
+      return (function () {
+        "use strict";
+        ${cleaned}
+      })();
+    } finally {
+      __origFunc.prototype.constructor = __origFunc;
+    }
   `;
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
   const fn = new Function(...args, wrapped) as CompiledFn;

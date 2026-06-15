@@ -48,7 +48,10 @@ export default function GraphView({ spec, onRuntimeError }: Props) {
     c.style.height = `${H}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    ctx.fillStyle = "#ffffff";
+    const isDark = document.documentElement.classList.contains("dark");
+    const ink = isDark ? "#d4d4d8" : "#2a2c33";
+    const inkMuted = isDark ? "#a1a1aa" : "#6b6e78";
+    ctx.fillStyle = isDark ? "#1a1a1f" : "#ffffff";
     ctx.fillRect(0, 0, W, H);
 
     const padL = 50;
@@ -102,14 +105,14 @@ export default function GraphView({ spec, onRuntimeError }: Props) {
           const y = padT + plotH - h;
           ctx.fillStyle = COLORS[i % COLORS.length];
           ctx.fillRect(x, y, bw, h);
-          ctx.fillStyle = "#2a2c33";
+          ctx.fillStyle = ink;
           ctx.fillText(b.label, x + bw / 2, padT + plotH + 16);
-          ctx.fillStyle = "#6b6e78";
+          ctx.fillStyle = inkMuted;
           ctx.fillText(String(b.value), x + bw / 2, y - 6);
         });
         // axis labels
         ctx.textAlign = "center";
-        ctx.fillStyle = "#6b6e78";
+        ctx.fillStyle = inkMuted;
         ctx.fillText(spec.x_label || "", W / 2, H - 6);
         ctx.save();
         ctx.translate(14, H / 2);
@@ -122,7 +125,7 @@ export default function GraphView({ spec, onRuntimeError }: Props) {
       // For non-bar charts: compute extents from all series.
       const allPts = series.flatMap((s) => s.points);
       if (!allPts.length) {
-        ctx.fillStyle = "#9f1f3a";
+        ctx.fillStyle = isDark ? "#f87171" : "#9f1f3a";
         ctx.fillText("No data points", 20, 40);
         return;
       }

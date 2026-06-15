@@ -70,26 +70,26 @@
 html.dark {
   color-scheme: dark;
 
-  --surface-canvas: #0f0f11;
-  --surface-raised: #1a1a1e;
-  --surface-sunken: #252529;
-  --surface-overlay: rgba(26, 26, 30, 0.92);
+  --surface-canvas: #0a0a0d;
+  --surface-raised: #16161b;
+  --surface-sunken: #1f1f25;
+  --surface-overlay: rgba(22, 22, 27, 0.92);
 
-  --border-subtle: #2a2a30;
-  --border-default: #35353d;
-  --border-strong: #45454d;
+  --border-subtle: #26262e;
+  --border-default: #32323a;
+  --border-strong: #42424a;
 
-  --ink-900: #e8e8ed;
-  --ink-700: #c5c5cd;
-  --ink-500: #8a8a95;
-  --ink-400: #6a6a75;
-  --ink-300: #4a4a52;
+  --ink-900: #eeeef2;
+  --ink-700: #c8c8d0;
+  --ink-500: #888894;
+  --ink-400: #686874;
+  --ink-300: #484854;
 
-  --accent-50:  #1e1e3a;
-  --accent-100: #2a2a50;
-  --accent-500: #7b85f0;
-  --accent-600: #6a75e0;
-  --accent-700: #8a95f8;
+  --accent-50:  #181838;
+  --accent-100: #222255;
+  --accent-500: #7e8cff;
+  --accent-600: #6a78e8;
+  --accent-700: #909cff;
 
   --tag-rose-bg: #5c2834;    --tag-rose-fg: #f5a8b8;    --tag-rose-ring: #7a3848;
   --tag-amber-bg: #5c3d1a;   --tag-amber-fg: #f5c87a;   --tag-amber-ring: #7a5528;
@@ -97,8 +97,8 @@ html.dark {
   --tag-violet-bg: #2e1a4a;  --tag-violet-fg: #b8a0f0;  --tag-violet-ring: #4a2870;
   --tag-sky-bg: #1a2e4a;     --tag-sky-fg: #80b8f0;     --tag-sky-ring: #284a70;
 
-  --button-primary-bg: #3a3a3e;
-  --button-primary-hover: #55555e;
+  --button-primary-bg: #383840;
+  --button-primary-hover: #4e4e58;
 
   --feedback-correct-bg: #064e3b;
   --feedback-correct-border: #059669;
@@ -109,12 +109,12 @@ html.dark {
   --feedback-wrong-text: #fecdd3;
   --feedback-wrong-icon: #fb7185;
 
-  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.4);
-  --shadow-nav: 0 2px 8px rgba(0, 0, 0, 0.35);
-  --shadow-tooltip: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --shadow-tag-hover: 0 1px 4px rgba(0, 0, 0, 0.4);
-  --shadow-viz-icon: 0 2px 8px rgba(0, 0, 0, 0.4);
-  --shadow-banner: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-nav: 0 2px 8px rgba(0, 0, 0, 0.45);
+  --shadow-tooltip: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --shadow-tag-hover: 0 1px 4px rgba(0, 0, 0, 0.5);
+  --shadow-viz-icon: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-banner: 0 8px 24px rgba(0, 0, 0, 0.5);
 
   --background: var(--surface-canvas);
   --foreground: var(--ink-900);

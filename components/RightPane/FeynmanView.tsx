@@ -255,7 +255,7 @@ export default function FeynmanView({ docId }: Props) {
           </button>
           {!active && error && (
             <div className="mt-2">
-              <p className="text-[11px] leading-relaxed text-rose-700">{error}</p>
+              <p className="text-[11px] leading-relaxed text-[var(--feedback-wrong-text)]">{error}</p>
               <button
                 type="button"
                 onClick={start}
@@ -362,7 +362,7 @@ function SessionListItem({
         <button
           type="button"
           onClick={onDelete}
-          className="invisible flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--ink-400)] hover:bg-[var(--surface-sunken)] hover:text-rose-600 group-hover:visible"
+          className="invisible flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--ink-400)] hover:bg-[var(--surface-sunken)] hover:text-[var(--feedback-wrong-icon)] group-hover:visible"
           title="Delete"
         >
           <Trash2 className="h-3 w-3" />
@@ -705,7 +705,7 @@ function VoiceConsole({
   const hasTranscript = finalText.trim().length > 0 || interimText.trim().length > 0;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-gradient-to-b from-white via-[#fafaff] to-[#f4f3fb] px-5 pt-4 pb-6">
+    <div className="flex min-h-0 flex-1 flex-col bg-[var(--surface-raised)] px-5 pt-4 pb-6">
       <div className="mx-auto flex w-full max-w-2xl flex-col items-center">
         {prompt && (
           <div className="flex w-full items-start gap-2 rounded-lg border border-[var(--accent-100)] bg-[var(--accent-50)] px-3 py-2.5 text-[13px] leading-relaxed text-[var(--ink-900)]">
@@ -733,7 +733,7 @@ function VoiceConsole({
             else startMic();
           }}
           disabled={busy || !prompt || !hasMicSupport}
-          className="rounded-full transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+          className="max-w-full rounded-full transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
           title={listening ? "Tap to stop and send" : "Tap to speak"}
         >
           <VoiceBlob state={blobState} level={level} size={260} />
@@ -752,10 +752,10 @@ function VoiceConsole({
           </div>
         )}
         {voiceError && (
-          <p className="text-[11.5px] leading-relaxed text-rose-700">{voiceError}</p>
+          <p className="text-[11.5px] leading-relaxed text-[var(--feedback-wrong-text)]">{voiceError}</p>
         )}
         {!hasMicSupport && (
-          <p className="text-[11.5px] leading-relaxed text-rose-700">
+          <p className="text-[11.5px] leading-relaxed text-[var(--feedback-wrong-text)]">
             Voice input is not supported by this browser. Try Chrome, Edge or Safari.
           </p>
         )}

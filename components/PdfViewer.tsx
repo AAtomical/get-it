@@ -202,7 +202,7 @@ export default function PdfViewer({
 
   return (
     <div className="relative h-full">
-      <div ref={scrollRef} className="relative flex h-full flex-col overflow-y-auto bg-white">
+      <div ref={scrollRef} className="relative flex h-full flex-col overflow-y-auto bg-[var(--surface-raised)]">
           {detecting && (
           <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-[var(--border-subtle)] bg-[var(--surface-raised)]/90 px-4 py-2 text-[12px] text-[var(--ink-500)] backdrop-blur">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent-600)]" />
@@ -407,7 +407,7 @@ function PdfPage({
   return (
     <div
       data-page={pageNumber - 1}
-      className="relative shrink-0 bg-white"
+      className="relative shrink-0 bg-[var(--surface-sunken)]"
       style={{
         width: pdfWidth * scale,
         height: pdfHeight * scale,

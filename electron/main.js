@@ -304,7 +304,7 @@ function createMainWindow() {
     minWidth: 960,
     minHeight: 600,
     title: "Get It.",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#111113",
     show: false,
     // Modern integrated title bar: the app's top tab-bar becomes the
     // drag region, and platform-native window controls are inset into
@@ -323,7 +323,7 @@ function createMainWindow() {
     //     decoration above it.
     titleBarStyle: isMac ? "hiddenInset" : isWin ? "hidden" : "default",
     titleBarOverlay: isWin
-      ? { color: "#ffffff", symbolColor: "#111113", height: 36 }
+      ? { color: "#111113", symbolColor: "#e4e4e7", height: 36 }
       : undefined,
     trafficLightPosition: isMac ? { x: 14, y: 14 } : undefined,
     webPreferences: {
