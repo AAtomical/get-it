@@ -40,33 +40,33 @@ const RATING_LABELS: Record<
   }
 > = {
    1: {
-     text: "Again",
-     hint: "Missed recall",
-     tone: "border-rose-400 bg-rose-200 text-rose-900 hover:bg-rose-300",
-     dot: "bg-rose-500",
-     meter: "bg-rose-500",
-   },
-   2: {
-     text: "Hard",
-     hint: "Needs another pass",
-     tone: "border-amber-400 bg-amber-200 text-amber-900 hover:bg-amber-300",
-     dot: "bg-amber-500",
-     meter: "bg-amber-500",
-   },
-   3: {
-     text: "Good",
-     hint: "Mostly recalled",
-     tone: "border-emerald-400 bg-emerald-200 text-emerald-900 hover:bg-emerald-300",
-     dot: "bg-emerald-500",
-     meter: "bg-emerald-500",
-   },
-   4: {
-     text: "Easy",
-     hint: "Instant recall",
-     tone: "border-sky-400 bg-sky-200 text-sky-900 hover:bg-sky-300",
-     dot: "bg-sky-500",
-     meter: "bg-sky-500",
-   },
+      text: "Again",
+      hint: "Missed recall",
+      tone: "border-[var(--feedback-wrong-border)] bg-[var(--feedback-wrong-bg)] text-[var(--feedback-wrong-text)] hover:bg-[var(--feedback-wrong-bg)]",
+      dot: "bg-[var(--feedback-wrong-icon)]",
+      meter: "bg-[var(--feedback-wrong-icon)]",
+    },
+    2: {
+      text: "Hard",
+      hint: "Needs another pass",
+      tone: "border-[var(--tag-amber-ring)] bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)] hover:bg-[var(--tag-amber-bg)]",
+      dot: "bg-[var(--tag-amber-fg)]",
+      meter: "bg-[var(--tag-amber-fg)]",
+    },
+    3: {
+      text: "Good",
+      hint: "Mostly recalled",
+      tone: "border-[var(--feedback-correct-border)] bg-[var(--feedback-correct-bg)] text-[var(--feedback-correct-text)] hover:bg-[var(--feedback-correct-bg)]",
+      dot: "bg-[var(--feedback-correct-icon)]",
+      meter: "bg-[var(--feedback-correct-icon)]",
+    },
+    4: {
+      text: "Easy",
+      hint: "Instant recall",
+      tone: "border-[var(--tag-sky-ring)] bg-[var(--tag-sky-bg)] text-[var(--tag-sky-fg)] hover:bg-[var(--tag-sky-bg)]",
+      dot: "bg-[var(--tag-sky-fg)]",
+      meter: "bg-[var(--tag-sky-fg)]",
+    },
 };
 
 export default function FlashcardsView({ docId }: Props) {

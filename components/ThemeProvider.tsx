@@ -43,21 +43,14 @@ export default function ThemeProvider({
     return () => window.removeEventListener(SETTINGS_EVENT, onChange);
   }, []);
 
-  // Re-evaluate when system preference changes (only matters when no explicit theme).
+  // Re-evaluate when system preference changes — always fetch current
+  // persisted theme so explicit choices aren't overridden.
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => {
-      if (!initialTheme) {
-        applyTheme(undefined);
-      } else {
-        // Explicit theme is set — the class won't change from system preference,
-        // but we sync from the server in case another window changed it.
-        reapply();
-      }
-    };
+    const onChange = () => { reapply(); };
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
-  }, [initialTheme, reapply]);
+  }, [reapply]);
 
   return <>{children}</>;
 }

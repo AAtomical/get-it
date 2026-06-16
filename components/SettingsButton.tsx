@@ -84,6 +84,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
   const [maxRetries, setMaxRetries] = useState<number>(MAX_VIZ_GEN_RETRIES);
   const [theme, setTheme] = useState<"light" | "dark" | undefined>();
   const hydratedRef = useRef(false);
+  const userToggledRef = useRef(false);
 
   // Effective theme — if no explicit preference is stored, follow system.
   const effectiveTheme = useMemo<"light" | "dark">(() => {
@@ -99,6 +100,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
   useEffect(() => {
     if (refreshKey !== "open") return;
     hydratedRef.current = false;
+    userToggledRef.current = false;
     let cancelled = false;
     fetch("/api/settings", { cache: "no-store" })
       .then((r) => r.json())
@@ -106,7 +108,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
         if (cancelled) return;
         if (typeof s.autoGenerate === "boolean") setAutoGenerate(s.autoGenerate);
         if (typeof s.maxRetries === "number") setMaxRetries(s.maxRetries);
-        if (s.theme === "light" || s.theme === "dark") setTheme(s.theme);
+        if (!userToggledRef.current && (s.theme === "light" || s.theme === "dark")) setTheme(s.theme);
         hydratedRef.current = true;
       })
       .catch(() => {
@@ -156,6 +158,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
   );
 
   const onThemeToggle = useCallback(() => {
+    userToggledRef.current = true;
     const next = effectiveTheme === "dark" ? "light" : "dark";
     setTheme(next);
     persist({ theme: next });

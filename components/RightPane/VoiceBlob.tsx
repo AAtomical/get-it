@@ -179,6 +179,7 @@ export default function VoiceBlob({ state, level, size = 280 }: Props) {
         width: size,
         height: size,
         maxWidth: "100%",
+        aspectRatio: "1",
         filter: "drop-shadow(0 12px 40px rgba(140,150,210,0.22))",
       }}
     />

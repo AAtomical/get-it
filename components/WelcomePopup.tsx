@@ -169,7 +169,7 @@ function Backdrop({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-[var(--surface-raised)] shadow-[0_24px_64px_rgba(17,17,19,0.18)]">
+      <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-[var(--surface-raised)] shadow-[var(--shadow-modal)]">
         <button
           type="button"
           onClick={onClose}

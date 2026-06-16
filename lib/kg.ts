@@ -8,6 +8,7 @@
  */
 
 import fs from "node:fs";
+import { randomUUID } from "node:crypto";
 import { ensureDocDir, kgPath } from "./paths";
 import type { KnowledgeGraph } from "./kg-types";
 
@@ -34,7 +35,7 @@ export function loadKG(docId: string): KnowledgeGraph | null {
 export function saveKG(kg: KnowledgeGraph): void {
   ensureDocDir(kg.docId);
   const path = kgPath(kg.docId);
-  const tmp = `${path}.tmp`;
+  const tmp = `${path}.${randomUUID()}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(kg, null, 2));
   fs.renameSync(tmp, path);
 }

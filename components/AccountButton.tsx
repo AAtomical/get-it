@@ -171,7 +171,7 @@ function AccountPanel({ refreshKey }: { refreshKey: string }) {
           onClick={handleLogout}
           disabled={loggingOut || (!data?.account && !err)}
           title="Sign out of Codex and return to the setup wizard"
-          className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-0.5 text-[10.5px] font-medium text-[var(--ink-700)] transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
+          className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-0.5 text-[10.5px] font-medium text-[var(--ink-700)] transition hover:border-[var(--feedback-wrong-border)] hover:bg-[var(--feedback-wrong-bg)] hover:text-[var(--feedback-wrong-text)] disabled:opacity-50"
         >
           {loggingOut ? (
             <RefreshCw className="h-2.5 w-2.5 animate-spin" />

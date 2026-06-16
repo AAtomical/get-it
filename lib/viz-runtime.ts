@@ -6,9 +6,10 @@
  */
 
 // "import" is a reserved word and can't be used as a parameter name; it's
-// a syntax error to call it as a function anyway. eval and Function are
-// shadowed here, and the constructor-chain escape is blocked by nulling
-// Function.prototype.constructor before the model code runs (restored in finally).
+// a syntax error to call it as a function anyway. eval, Function, async
+// and generator constructors are shadowed here, and the constructor-chain
+// escape is blocked by nulling Function/AsyncFunction/GeneratorFunction
+// prototype.constructor before the model code runs (restored in finally).
 const FORBIDDEN = [
   "window",
   "document",
@@ -47,7 +48,11 @@ export function compileFn(body: string): CompiledFn {
   // shadows the outer binding instead of colliding with it.
   const wrapped = `
     const __origFunc = {}.constructor.constructor;
+    const __origAsync = Object.getPrototypeOf(async function(){}).constructor;
+    const __origGen = Object.getPrototypeOf(function*(){}).constructor;
     __origFunc.prototype.constructor = void 0;
+    __origAsync.prototype.constructor = void 0;
+    __origGen.prototype.constructor = void 0;
     try {
       const THREE = api.THREE;
       const scene = api.scene;
@@ -64,6 +69,8 @@ export function compileFn(body: string): CompiledFn {
       })();
     } finally {
       __origFunc.prototype.constructor = __origFunc;
+      __origAsync.prototype.constructor = __origAsync;
+      __origGen.prototype.constructor = __origGen;
     }
   `;
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func

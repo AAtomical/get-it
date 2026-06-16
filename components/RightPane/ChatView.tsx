@@ -340,7 +340,7 @@ function Bubble({
           isUser
             ? "bg-[var(--button-primary-bg)] text-white"
             : "bg-[var(--surface-sunken)] text-[var(--ink-900)]"
-        } ${pulsing ? "animate-pulse whitespace-pre-wrap" : ""}`}
+        } whitespace-pre-wrap ${pulsing ? "animate-pulse" : ""}`}
       >
         {pulsing ? (
           content

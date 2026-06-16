@@ -58,6 +58,7 @@
 
   /* Shadow tokens — opaque so they can be overridden per theme */
   --shadow-popover: 0 8px 24px rgba(17, 17, 19, 0.08);
+  --shadow-modal: 0 24px 64px rgba(17, 17, 19, 0.18);
   --shadow-nav: 0 2px 8px rgba(17, 17, 19, 0.06);
   --shadow-tooltip: 0 8px 24px rgba(17, 17, 19, 0.10);
   --shadow-tag-hover: 0 1px 4px rgba(17, 17, 19, 0.08);
@@ -110,6 +111,7 @@ html.dark {
   --feedback-wrong-icon: #fb7185;
 
   --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.55);
   --shadow-nav: 0 2px 8px rgba(0, 0, 0, 0.45);
   --shadow-tooltip: 0 8px 24px rgba(0, 0, 0, 0.6);
   --shadow-tag-hover: 0 1px 4px rgba(0, 0, 0, 0.5);

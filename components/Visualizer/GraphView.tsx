@@ -22,6 +22,15 @@ export default function GraphView({ spec, onRuntimeError }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const reportedRef = useRef(false);
+  const [themeVersion, setThemeVersion] = useState(0);
+
+  // Re-draw when the html.dark class toggles.
+  useEffect(() => {
+    const el = document.documentElement;
+    const obs = new MutationObserver(() => setThemeVersion((v) => v + 1));
+    obs.observe(el, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
 
   useEffect(() => {
     setError(null);
@@ -152,10 +161,10 @@ export default function GraphView({ spec, onRuntimeError }: Props) {
       const sy = (y: number) => padT + plotH - ((y - yMin) / (yMax - yMin)) * plotH;
 
       // Grid + axes
-      ctx.strokeStyle = "rgba(20,22,26,0.08)";
+      ctx.strokeStyle = isDark ? "rgba(238,238,242,0.1)" : "rgba(20,22,26,0.08)";
       ctx.lineWidth = 1;
       ctx.font = "10px ui-sans-serif, system-ui";
-      ctx.fillStyle = "#6b6e78";
+      ctx.fillStyle = inkMuted;
       ctx.textAlign = "right";
       ctx.textBaseline = "middle";
       const yTicks = 5;
@@ -183,14 +192,14 @@ export default function GraphView({ spec, onRuntimeError }: Props) {
 
       // Origin axes
       if (xMin <= 0 && xMax >= 0) {
-        ctx.strokeStyle = "rgba(20,22,26,0.22)";
+        ctx.strokeStyle = isDark ? "rgba(238,238,242,0.3)" : "rgba(20,22,26,0.22)";
         ctx.beginPath();
         ctx.moveTo(sx(0), padT);
         ctx.lineTo(sx(0), padT + plotH);
         ctx.stroke();
       }
       if (yMin <= 0 && yMax >= 0) {
-        ctx.strokeStyle = "rgba(20,22,26,0.22)";
+        ctx.strokeStyle = isDark ? "rgba(238,238,242,0.3)" : "rgba(20,22,26,0.22)";
         ctx.beginPath();
         ctx.moveTo(padL, sy(0));
         ctx.lineTo(padL + plotW, sy(0));
@@ -230,7 +239,7 @@ export default function GraphView({ spec, onRuntimeError }: Props) {
         series.forEach((s) => {
           ctx.fillStyle = s.color;
           ctx.fillRect(lx, ly - 3, 18, 6);
-          ctx.fillStyle = "#2a2c33";
+          ctx.fillStyle = ink;
           const txt = s.name || "";
           ctx.fillText(txt, lx + 24, ly);
           lx += 30 + ctx.measureText(txt).width;
@@ -238,7 +247,7 @@ export default function GraphView({ spec, onRuntimeError }: Props) {
       }
 
       // Axis labels
-      ctx.fillStyle = "#6b6e78";
+      ctx.fillStyle = inkMuted;
       ctx.font = "11px ui-sans-serif, system-ui";
       ctx.textAlign = "center";
       ctx.fillText(spec.x_label || "x", padL + plotW / 2, H - 8);
@@ -254,7 +263,7 @@ export default function GraphView({ spec, onRuntimeError }: Props) {
     // onRuntimeError captured by closure; we don't re-render the chart on
     // every parent rerender that produces a new function reference.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spec]);
+  }, [spec, themeVersion]);
 
   return (
     <div ref={containerRef} className="relative h-full w-full">

@@ -29,7 +29,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-const DOC_ID_RE = /^[a-f0-9-]{1,64}$/;
+const DOC_ID_RE = /^[a-z0-9-]{1,64}$/;
 function assertValidDocId(docId: string): void {
   if (!DOC_ID_RE.test(docId)) {
     throw new Error(`Invalid docId: ${docId}`);
