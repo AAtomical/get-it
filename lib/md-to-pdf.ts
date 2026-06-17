@@ -11,10 +11,18 @@
  * We tokenize with `marked` (already a project dependency) and lay the
  * tokens out with `pdfkit` (the same library `scripts/generate-sample-pdfs.ts`
  * uses to mint the bundled sample documents), so this adds no new runtime
- * dependency. The standard PDF fonts cover Latin scripts; non-Latin scripts
- * (CJK, etc.) would need an embedded font and are a deliberate follow-up.
+ * dependency.
+ *
+ * Scripts: the standard PDF fonts cover Latin. When the document contains
+ * CJK (or kana / hangul / fullwidth) characters we register a system CJK
+ * font and render the whole document with it — those fonts carry Latin
+ * glyphs too, so mixed English/Chinese reads correctly. If no CJK font is
+ * found on the host we fall back to the Latin fonts and Latin text still
+ * renders; the text-coverage gate downstream will reject a doc that came out
+ * blank, which is the right outcome on a system with no CJK font at all.
  */
 
+import fs from "node:fs";
 import PDFDocument from "pdfkit";
 import { marked, type Token, type Tokens } from "marked";
 
@@ -56,13 +64,27 @@ const ACCENT = "#4f5ae0";
 const RULE = "#cbd5e1";
 const CODE_BG = "#f3f2ef";
 
-const FONT = {
+/** The four weights + monospace a document is drawn with. Swapped wholesale
+ *  for a registered CJK family when the source contains CJK characters. */
+type Fonts = {
+  regular: string;
+  bold: string;
+  italic: string;
+  boldItalic: string;
+  mono: string;
+};
+
+const LATIN_FONTS: Fonts = {
   regular: "Helvetica",
   bold: "Helvetica-Bold",
   italic: "Helvetica-Oblique",
   boldItalic: "Helvetica-BoldOblique",
   mono: "Courier",
-} as const;
+};
+
+/** Matches CJK ideographs, kana, hangul, and CJK/fullwidth punctuation. */
+const CJK_RE =
+  /[　-ヿ㐀-䶿一-鿿豈-﫿＀-￯가-힯]/;
 
 /** Point size per heading depth (h1…h6). */
 const HEADING_SIZE = [22, 17, 14, 12.5, 11.5, 11];
@@ -71,6 +93,9 @@ const CODE_SIZE = 9;
 const LINE_GAP = 2.5;
 
 type PDFKitDoc = InstanceType<typeof PDFDocument>;
+
+/** Render context threaded through every block renderer. */
+type Ctx = { doc: PDFKitDoc; fonts: Fonts };
 
 /** Inline run after emphasis/link nesting has been flattened to leaves. */
 type Segment = {
@@ -84,6 +109,94 @@ type Segment = {
 type Style = { bold: boolean; italic: boolean };
 
 const BASE_STYLE: Style = { bold: false, italic: false };
+
+// ── CJK font resolution ─────────────────────────────────────────────────
+
+type CjkFace = { path: string; postscript?: string };
+type CjkPair = { regular: CjkFace; bold: CjkFace };
+
+/** Per-platform candidate CJK fonts, in preference order. `postscript` names
+ *  a face inside a `.ttc` collection (omitted for single-face `.ttf`/`.otf`). */
+function cjkCandidates(): CjkPair[] {
+  switch (process.platform) {
+    case "darwin":
+      return [
+        {
+          regular: { path: "/System/Library/Fonts/PingFang.ttc", postscript: "PingFangSC-Regular" },
+          bold: { path: "/System/Library/Fonts/PingFang.ttc", postscript: "PingFangSC-Semibold" },
+        },
+        {
+          regular: { path: "/System/Library/Fonts/Hiragino Sans GB.ttc", postscript: "HiraginoSansGB-W3" },
+          bold: { path: "/System/Library/Fonts/Hiragino Sans GB.ttc", postscript: "HiraginoSansGB-W6" },
+        },
+        {
+          regular: { path: "/System/Library/Fonts/Supplemental/Arial Unicode.ttf" },
+          bold: { path: "/System/Library/Fonts/Supplemental/Arial Unicode.ttf" },
+        },
+      ];
+    case "win32":
+      return [
+        {
+          regular: { path: "C:\\Windows\\Fonts\\msyh.ttc", postscript: "MicrosoftYaHei" },
+          bold: { path: "C:\\Windows\\Fonts\\msyhbd.ttc", postscript: "MicrosoftYaHei-Bold" },
+        },
+        {
+          regular: { path: "C:\\Windows\\Fonts\\simsun.ttc", postscript: "SimSun" },
+          bold: { path: "C:\\Windows\\Fonts\\simsun.ttc", postscript: "SimSun" },
+        },
+        {
+          regular: { path: "C:\\Windows\\Fonts\\malgun.ttf" },
+          bold: { path: "C:\\Windows\\Fonts\\malgunbd.ttf" },
+        },
+      ];
+    default:
+      return [
+        {
+          regular: { path: "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", postscript: "NotoSansCJKsc-Regular" },
+          bold: { path: "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", postscript: "NotoSansCJKsc-Bold" },
+        },
+        {
+          regular: { path: "/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf", postscript: "NotoSansCJKsc-Regular" },
+          bold: { path: "/usr/share/fonts/opentype/noto/NotoSansCJKsc-Bold.otf", postscript: "NotoSansCJKsc-Bold" },
+        },
+        {
+          regular: { path: "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc" },
+          bold: { path: "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc" },
+        },
+      ];
+  }
+}
+
+/** First candidate whose regular face exists on disk, or null. */
+function resolveCjkFont(): CjkPair | null {
+  for (const c of cjkCandidates()) {
+    if (fs.existsSync(c.regular.path)) {
+      return { regular: c.regular, bold: fs.existsSync(c.bold.path) ? c.bold : c.regular };
+    }
+  }
+  return null;
+}
+
+/**
+ * If the markdown needs CJK and a system font is available, register it on
+ * the document and return a CJK font map; otherwise return the Latin map.
+ */
+function setUpFonts(doc: PDFKitDoc, markdown: string): Fonts {
+  if (!CJK_RE.test(markdown)) return LATIN_FONTS;
+  const face = resolveCjkFont();
+  if (!face) return LATIN_FONTS;
+  try {
+    doc.registerFont("cjk", face.regular.path, face.regular.postscript);
+    doc.registerFont("cjk-bold", face.bold.path, face.bold.postscript);
+  } catch {
+    return LATIN_FONTS;
+  }
+  // CJK has no italic; reuse the upright faces. Code uses the CJK font too so
+  // CJK inside code blocks still renders (at the cost of true monospacing).
+  return { regular: "cjk", bold: "cjk-bold", italic: "cjk", boldItalic: "cjk-bold", mono: "cjk" };
+}
+
+// ── Inline flattening ───────────────────────────────────────────────────
 
 /** Decode the handful of HTML entities `marked` leaves encoded in token text. */
 function decodeEntities(s: string): string {
@@ -155,12 +268,12 @@ function flattenInline(tokens: Token[] | undefined, style: Style, out: Segment[]
   }
 }
 
-function fontFor(seg: Segment): string {
-  if (seg.mono) return FONT.mono;
-  if (seg.bold && seg.italic) return FONT.boldItalic;
-  if (seg.bold) return FONT.bold;
-  if (seg.italic) return FONT.italic;
-  return FONT.regular;
+function fontFor(seg: Segment, fonts: Fonts): string {
+  if (seg.mono) return fonts.mono;
+  if (seg.bold && seg.italic) return fonts.boldItalic;
+  if (seg.bold) return fonts.bold;
+  if (seg.italic) return fonts.italic;
+  return fonts.regular;
 }
 
 type EmitOpts = {
@@ -172,7 +285,8 @@ type EmitOpts = {
 };
 
 /** Emit a run of flattened segments as a single wrapped paragraph. */
-function emitSegments(doc: PDFKitDoc, segs: Segment[], opts: EmitOpts): void {
+function emitSegments(ctx: Ctx, segs: Segment[], opts: EmitOpts): void {
+  const { doc, fonts } = ctx;
   const width = opts.width ?? CONTENT_WIDTH - (opts.indent ?? 0);
   if (segs.length === 0) {
     doc.text(" ", { width });
@@ -181,7 +295,7 @@ function emitSegments(doc: PDFKitDoc, segs: Segment[], opts: EmitOpts): void {
   const last = segs.length - 1;
   segs.forEach((seg, i) => {
     doc
-      .font(fontFor(seg))
+      .font(fontFor(seg, fonts))
       .fontSize(opts.size)
       .fillColor(seg.link ? ACCENT : opts.color);
     const textOpts: PDFKit.Mixins.TextOptions = {
@@ -205,7 +319,8 @@ function breakIfTight(doc: PDFKitDoc, needed: number): void {
 
 // ── Block renderers ─────────────────────────────────────────────────────
 
-function renderHeading(doc: PDFKitDoc, token: Tokens.Heading): void {
+function renderHeading(ctx: Ctx, token: Tokens.Heading): void {
+  const { doc } = ctx;
   const size = HEADING_SIZE[Math.min(token.depth, HEADING_SIZE.length) - 1];
   breakIfTight(doc, size * 2.4);
   doc.moveDown(token.depth <= 2 ? 0.6 : 0.4);
@@ -213,17 +328,18 @@ function renderHeading(doc: PDFKitDoc, token: Tokens.Heading): void {
   flattenInline(token.tokens, BASE_STYLE, segs);
   // Headings render in a single weight regardless of inline emphasis.
   for (const s of segs) s.bold = true;
-  emitSegments(doc, segs, { size, color: INK_900, paragraphGap: 4 });
+  emitSegments(ctx, segs, { size, color: INK_900, paragraphGap: 4 });
   doc.moveDown(0.25);
 }
 
-function renderParagraph(doc: PDFKitDoc, token: Tokens.Paragraph): void {
+function renderParagraph(ctx: Ctx, token: Tokens.Paragraph): void {
   const segs: Segment[] = [];
   flattenInline(token.tokens, BASE_STYLE, segs);
-  emitSegments(doc, segs, { size: BODY_SIZE, color: INK_700, paragraphGap: 8 });
+  emitSegments(ctx, segs, { size: BODY_SIZE, color: INK_700, paragraphGap: 8 });
 }
 
-function renderList(doc: PDFKitDoc, token: Tokens.List, depth = 0): void {
+function renderList(ctx: Ctx, token: Tokens.List, depth = 0): void {
+  const { doc, fonts } = ctx;
   const indent = 18 + depth * 16;
   let index = typeof token.start === "number" ? token.start : 1;
   for (const item of token.items) {
@@ -231,7 +347,7 @@ function renderList(doc: PDFKitDoc, token: Tokens.List, depth = 0): void {
     breakIfTight(doc, BODY_SIZE * 2);
     const markerX = MARGIN + indent - 14;
     const y = doc.y;
-    doc.font(FONT.regular).fontSize(BODY_SIZE).fillColor(INK_500).text(marker, markerX, y, {
+    doc.font(fonts.regular).fontSize(BODY_SIZE).fillColor(INK_500).text(marker, markerX, y, {
       width: 14,
       lineGap: LINE_GAP,
     });
@@ -246,7 +362,7 @@ function renderList(doc: PDFKitDoc, token: Tokens.List, depth = 0): void {
       else if (child.type === "text") flattenInline((child as Tokens.Text).tokens ?? [child as Token], BASE_STYLE, inline);
       else flattenInline([child], BASE_STYLE, inline);
     }
-    emitSegments(doc, inline, {
+    emitSegments(ctx, inline, {
       size: BODY_SIZE,
       color: INK_700,
       indent,
@@ -254,15 +370,16 @@ function renderList(doc: PDFKitDoc, token: Tokens.List, depth = 0): void {
       paragraphGap: 3,
     });
     doc.x = MARGIN;
-    for (const sub of nested) renderList(doc, sub, depth + 1);
+    for (const sub of nested) renderList(ctx, sub, depth + 1);
     index++;
   }
   doc.moveDown(0.3);
 }
 
-function renderCode(doc: PDFKitDoc, token: Tokens.Code): void {
+function renderCode(ctx: Ctx, token: Tokens.Code): void {
+  const { doc, fonts } = ctx;
   const code = token.text.replace(/\n+$/, "");
-  doc.font(FONT.mono).fontSize(CODE_SIZE);
+  doc.font(fonts.mono).fontSize(CODE_SIZE);
   const innerWidth = CONTENT_WIDTH - 20;
   const height = doc.heightOfString(code, { width: innerWidth, lineGap: 2 });
   breakIfTight(doc, height + 16);
@@ -273,7 +390,7 @@ function renderCode(doc: PDFKitDoc, token: Tokens.Code): void {
     .fill(CODE_BG)
     .restore();
   doc
-    .font(FONT.mono)
+    .font(fonts.mono)
     .fontSize(CODE_SIZE)
     .fillColor(INK_700)
     .text(code, MARGIN + 10, top + 7, { width: innerWidth, lineGap: 2 });
@@ -282,10 +399,11 @@ function renderCode(doc: PDFKitDoc, token: Tokens.Code): void {
   doc.moveDown(0.5);
 }
 
-function renderBlockquote(doc: PDFKitDoc, token: Tokens.Blockquote): void {
+function renderBlockquote(ctx: Ctx, token: Tokens.Blockquote): void {
+  const { doc } = ctx;
   const top = doc.y;
   doc.x = MARGIN + 16;
-  for (const child of token.tokens) renderBlock(doc, child);
+  for (const child of token.tokens) renderBlock(ctx, child);
   const bottom = doc.y;
   doc
     .save()
@@ -299,7 +417,8 @@ function renderBlockquote(doc: PDFKitDoc, token: Tokens.Blockquote): void {
   doc.moveDown(0.3);
 }
 
-function renderTable(doc: PDFKitDoc, token: Tokens.Table): void {
+function renderTable(ctx: Ctx, token: Tokens.Table): void {
+  const { doc, fonts } = ctx;
   const cols = token.header.length;
   if (cols === 0) return;
   const colWidth = CONTENT_WIDTH / cols;
@@ -309,7 +428,7 @@ function renderTable(doc: PDFKitDoc, token: Tokens.Table): void {
     return segs.map((s) => s.text).join("");
   };
   const drawRow = (cells: Tokens.TableCell[], header: boolean): void => {
-    const font = header ? FONT.bold : FONT.regular;
+    const font = header ? fonts.bold : fonts.regular;
     const color = header ? INK_500 : INK_700;
     doc.font(font).fontSize(header ? 9 : 10);
     const heights = cells.map((c) =>
@@ -355,31 +474,31 @@ function renderHr(doc: PDFKitDoc): void {
   doc.moveDown(0.5);
 }
 
-function renderBlock(doc: PDFKitDoc, token: Token): void {
+function renderBlock(ctx: Ctx, token: Token): void {
   switch (token.type) {
     case "heading":
-      renderHeading(doc, token as Tokens.Heading);
+      renderHeading(ctx, token as Tokens.Heading);
       break;
     case "paragraph":
-      renderParagraph(doc, token as Tokens.Paragraph);
+      renderParagraph(ctx, token as Tokens.Paragraph);
       break;
     case "list":
-      renderList(doc, token as Tokens.List);
+      renderList(ctx, token as Tokens.List);
       break;
     case "code":
-      renderCode(doc, token as Tokens.Code);
+      renderCode(ctx, token as Tokens.Code);
       break;
     case "blockquote":
-      renderBlockquote(doc, token as Tokens.Blockquote);
+      renderBlockquote(ctx, token as Tokens.Blockquote);
       break;
     case "table":
-      renderTable(doc, token as Tokens.Table);
+      renderTable(ctx, token as Tokens.Table);
       break;
     case "hr":
-      renderHr(doc);
+      renderHr(ctx.doc);
       break;
     case "space":
-      doc.moveDown(0.4);
+      ctx.doc.moveDown(0.4);
       break;
     case "html":
       break; // raw HTML is dropped — we render text, not markup
@@ -387,7 +506,7 @@ function renderBlock(doc: PDFKitDoc, token: Token): void {
       // Anything else with text (e.g. a bare text block) still gets rendered.
       const t = token as { text?: string };
       if (t.text && t.text.trim()) {
-        doc.font(FONT.regular).fontSize(BODY_SIZE).fillColor(INK_700).text(decodeEntities(t.text), {
+        ctx.doc.font(ctx.fonts.regular).fontSize(BODY_SIZE).fillColor(INK_700).text(decodeEntities(t.text), {
           width: CONTENT_WIDTH,
           lineGap: LINE_GAP,
           paragraphGap: 8,
@@ -427,8 +546,10 @@ export async function markdownToPdf(markdown: string): Promise<Buffer> {
     doc.on("error", reject);
   });
 
+  const ctx: Ctx = { doc, fonts: setUpFonts(doc, markdown) };
+
   doc.x = MARGIN;
-  for (const token of tokens) renderBlock(doc, token);
+  for (const token of tokens) renderBlock(ctx, token);
 
   doc.end();
   return done;
