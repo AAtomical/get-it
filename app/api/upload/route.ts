@@ -25,11 +25,19 @@ import {
   type PdfRejectReason,
   type PdfQualityStats,
 } from "@/lib/pdf-extract";
+import {
+  markdownToPdf,
+  MarkdownEmptyError,
+  MarkdownTooLargeError,
+} from "@/lib/md-to-pdf";
 import { ensureDocDir, pdfPath } from "@/lib/paths";
 import { getDoc, newDocId, saveDoc } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+/** Extensions we accept as Markdown and render to PDF before ingesting. */
+const MARKDOWN_EXT = /\.(md|markdown|mdown|mkd|mdwn)$/i;
 
 const SAMPLE_NAME_TO_DOC_ID: Record<string, string> = {
   anatomy: "sample-anatomy",
@@ -105,6 +113,24 @@ export async function POST(req: Request) {
       buffer = Buffer.from(await file.arrayBuffer());
       const fname = (file as unknown as { name?: string }).name;
       if (fname) filename = fname.replace(/[^a-z0-9._-]/gi, "_");
+
+      // Markdown uploads: render to a clean, text-bearing PDF up front, then
+      // fall through to the exact same extract → gate → store pipeline as any
+      // other PDF. The %PDF- sanity check below then validates the rendered
+      // bytes (pdfkit emits a 1.7 header).
+      if (MARKDOWN_EXT.test(filename)) {
+        try {
+          buffer = await markdownToPdf(buffer.toString("utf-8"));
+        } catch (e) {
+          if (e instanceof MarkdownEmptyError || e instanceof MarkdownTooLargeError) {
+            return NextResponse.json({ error: e.message }, { status: 422 });
+          }
+          return NextResponse.json(
+            { error: "This Markdown file couldn't be converted to a document." },
+            { status: 422 },
+          );
+        }
+      }
     }
   } else {
     return NextResponse.json({ error: "expected multipart/form-data" }, { status: 400 });

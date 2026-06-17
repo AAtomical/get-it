@@ -83,6 +83,10 @@ const FILENAME_TO_TITLE: Record<string, string> = {
   "chemistry.pdf": "Organic Chemistry",
 };
 
+/** A PDF, or a Markdown file we render to PDF on upload. Kept in sync with
+ *  MARKDOWN_EXT in app/api/upload/route.ts. */
+const ACCEPTED_FILE = /\.(pdf|md|markdown|mdown|mkd|mdwn)$/i;
+
 function humaniseAgo(ts: number): string {
   const dt = Date.now() - ts;
   if (dt < 5_000) return "just now";
@@ -137,8 +141,8 @@ export default function UploadCard() {
   const startUpload = useCallback(
     async (file: File) => {
       setError(null);
-      if (!file.name.toLowerCase().endsWith(".pdf")) {
-        setError("Please pick a PDF file");
+      if (!ACCEPTED_FILE.test(file.name)) {
+        setError("Please pick a PDF or Markdown (.md) file");
         return;
       }
       setBusy("upload");
@@ -203,7 +207,7 @@ export default function UploadCard() {
         <input
           ref={inputRef}
           type="file"
-          accept="application/pdf,.pdf"
+          accept="application/pdf,.pdf,text/markdown,.md,.markdown"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -237,7 +241,7 @@ export default function UploadCard() {
             </>
           ) : (
             <>
-              <span>Drop your PDF here, or</span>
+              <span>Drop your PDF or Markdown here, or</span>
               <span className="inline-flex items-center gap-1.5 rounded-md bg-[var(--accent-600)] px-3 py-1 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-[var(--accent-700)]">
                 <Upload className="h-3.5 w-3.5" />
                 Select the file
@@ -246,7 +250,7 @@ export default function UploadCard() {
           )}
         </p>
         <p className="mt-3 text-[11.5px] text-[var(--ink-400)]">
-          Text-tagged PDFs work best. No OCR.
+          Text-based PDFs and Markdown (.md) work best. No OCR.
         </p>
       </div>
 
