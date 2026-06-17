@@ -48,7 +48,7 @@ const FILENAME_TO_TITLE: Record<string, string> = {
 };
 
 function titleOf(filename: string): string {
-  return FILENAME_TO_TITLE[filename] ?? filename.replace(/\.pdf$/i, "");
+  return FILENAME_TO_TITLE[filename] ?? filename.replace(/\.(pdf|md|markdown|mdown|mkd|mdwn)$/i, "");
 }
 
 function humaniseAgo(ts: number): string {
