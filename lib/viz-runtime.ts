@@ -45,9 +45,9 @@ const FORBIDDEN = [
   "sessionStorage",
 ];
 
-// Captured at module load so they survive the constructor nulling inside
-// compileFn's wrapped function body. Passed as extra params so the
-// `new Function` body can reference them for restore in the finally block.
+// Captured at module load so they survive the constructor nulling that the
+// compileFn wrapper performs. NOT passed into the new Function body — the
+// model code's closure never sees them.
 const ORIG_FUNC = {}.constructor.constructor;
 const ORIG_ASYNC = Object.getPrototypeOf(async function () {}).constructor;
 const ORIG_GEN = Object.getPrototypeOf(function* () {}).constructor;
@@ -66,40 +66,46 @@ export function compileFn(body: string): CompiledFn {
     .replace(/```\s*$/i, "")
     .trim();
 
-  const args = ["api", ...FORBIDDEN, "__origFunc", "__origAsync", "__origGen"];
+  const args = ["api", ...FORBIDDEN];
   // Two-scope wrap: the outer fn body destructures `api` into the names the
   // model expects, then we run the model code inside an INNER IIFE so that
   // any `const THREE = ...` the model emits lives in its own scope and
   // shadows the outer binding instead of colliding with it.
+  //
+  // Constructor nulling/restoring is NOT done in here — it happens in the
+  // wrapper below so the original constructor references are never in a
+  // scope the model code's closure can reach.
   const wrapped = `
-    __origFunc.prototype.constructor = void 0;
-    __origAsync.prototype.constructor = void 0;
-    __origGen.prototype.constructor = void 0;
-    try {
-      const THREE = api.THREE;
-      const scene = api.scene;
-      const camera = api.camera;
-      const renderer = api.renderer;
-      const controls = api.controls;
-      const group = api.group;
-      const ctx = api.ctx;
-      const width = api.width;
-      const height = api.height;
-      return (function () {
-        "use strict";
-        ${cleaned}
-      })();
-    } finally {
-      __origFunc.prototype.constructor = __origFunc;
-      __origAsync.prototype.constructor = __origAsync;
-      __origGen.prototype.constructor = __origGen;
-    }
+    const THREE = api.THREE;
+    const scene = api.scene;
+    const camera = api.camera;
+    const renderer = api.renderer;
+    const controls = api.controls;
+    const group = api.group;
+    const ctx = api.ctx;
+    const width = api.width;
+    const height = api.height;
+    return (function () {
+      "use strict";
+      ${cleaned}
+    })();
   `;
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
-  const fn = new Function(...args, wrapped) as (
-    api: Record<string, unknown>,
-    ...rest: unknown[]
-  ) => unknown;
-  return (api: Record<string, unknown>) =>
-    fn(api, ...FORBIDDEN_UNDEFS, ORIG_FUNC, ORIG_ASYNC, ORIG_GEN) as ReturnType<CompiledFn>;
+  const fn = new Function(...args, wrapped) as (...args: unknown[]) => unknown;
+  return (api: Record<string, unknown>) => {
+    // Null constructors before the model code executes.  The ORIG_*
+    // references are captured at module scope and are *not* passed into
+    // `new Function` — they live only in this closure, which the model
+    // code cannot reach.
+    if (ORIG_FUNC) ORIG_FUNC.prototype.constructor = void 0;
+    if (ORIG_ASYNC) ORIG_ASYNC.prototype.constructor = void 0;
+    if (ORIG_GEN) ORIG_GEN.prototype.constructor = void 0;
+    try {
+      return fn(api, ...FORBIDDEN_UNDEFS) as ReturnType<CompiledFn>;
+    } finally {
+      if (ORIG_FUNC) ORIG_FUNC.prototype.constructor = ORIG_FUNC;
+      if (ORIG_ASYNC) ORIG_ASYNC.prototype.constructor = ORIG_ASYNC;
+      if (ORIG_GEN) ORIG_GEN.prototype.constructor = ORIG_GEN;
+    }
+  };
 }
