@@ -125,7 +125,14 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
     };
   }, [refreshKey]);
 
-  const persist = useCallback((delta: Partial<SettingsPayload>) => {
+  const persist = useCallback((delta: Partial<SettingsPayload>, skipHydrationCheck = false) => {
+    // Block non-theme writes until the fetch populates server-saved values.
+    // Without this, a user who toggles autoGenerate or maxRetries before the
+    // fetch resolves would persist a value derived from the build-time
+    // default (AUTO_GENERATE_VIZ / MAX_VIZ_GEN_RETRIES), silently overwriting
+    // whatever was previously saved on disk.
+    // The theme toggle is exempted so it can work immediately on open.
+    if (!skipHydrationCheck && !hydratedRef.current) return;
     void fetch("/api/settings", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -167,7 +174,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
     userToggledRef.current = true;
     const next = effectiveTheme === "dark" ? "light" : "dark";
     setTheme(next);
-    persist({ theme: next });
+    persist({ theme: next }, true);
     document.documentElement.classList.toggle("dark", next === "dark");
   }, [effectiveTheme, persist]);
 
