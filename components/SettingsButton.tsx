@@ -85,15 +85,21 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
   const [theme, setTheme] = useState<"light" | "dark" | undefined>();
   const hydratedRef = useRef(false);
   const userToggledRef = useRef(false);
+  const [osPrefersDark, setOsPrefersDark] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    setOsPrefersDark(mq.matches);
+    const onChange = () => setOsPrefersDark(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   // Effective theme — if no explicit preference is stored, follow system.
   const effectiveTheme = useMemo<"light" | "dark">(() => {
     if (theme === "light" || theme === "dark") return theme;
-    if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      return "dark";
-    }
-    return "light";
-  }, [theme]);
+    return osPrefersDark ? "dark" : "light";
+  }, [theme, osPrefersDark]);
 
   // Fetch fresh on every popover open so external changes (CLI edits,
   // a previous run-through-the-wizard, etc.) show up.

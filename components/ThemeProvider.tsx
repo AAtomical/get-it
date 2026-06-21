@@ -28,7 +28,7 @@ export default function ThemeProvider({
     fetch("/api/settings", { cache: "no-store" })
       .then((r) => r.json())
       .then((s: { theme?: string }) => applyTheme(s.theme))
-      .catch(() => applyTheme(undefined));
+      .catch(() => {});
   }, []);
 
   // Listen for live changes from the settings popover.

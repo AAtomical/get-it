@@ -402,7 +402,7 @@ function StatusDot({ ended, progress }: { ended: boolean; progress: number }) {
   return (
     <span
       className={`h-2 w-2 shrink-0 rounded-full ${
-        complete ? "bg-emerald-500" : progress > 0 ? "bg-[var(--accent-500)]" : "bg-[var(--ink-300)]"
+        complete ? "bg-[var(--feedback-correct-icon)]" : progress > 0 ? "bg-[var(--accent-500)]" : "bg-[var(--ink-300)]"
       }`}
       title={complete ? "Deck complete" : progress > 0 ? "In progress" : "Not started"}
     />

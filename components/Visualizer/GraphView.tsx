@@ -23,18 +23,25 @@ export default function GraphView({ spec, onRuntimeError }: Props) {
   const [error, setError] = useState<string | null>(null);
   const reportedRef = useRef(false);
   const [themeVersion, setThemeVersion] = useState(0);
+  const skipResetRef = useRef(false);
 
   // Re-draw when the html.dark class toggles.
   useEffect(() => {
     const el = document.documentElement;
-    const obs = new MutationObserver(() => setThemeVersion((v) => v + 1));
+    const obs = new MutationObserver(() => {
+      skipResetRef.current = true;
+      setThemeVersion((v) => v + 1);
+    });
     obs.observe(el, { attributes: true, attributeFilter: ["class"] });
     return () => obs.disconnect();
   }, []);
 
   useEffect(() => {
-    setError(null);
-    reportedRef.current = false;
+    if (!skipResetRef.current) {
+      setError(null);
+      reportedRef.current = false;
+    }
+    skipResetRef.current = false;
     const reportError = (msg: string) => {
       setError(msg);
       if (!reportedRef.current) {

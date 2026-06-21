@@ -14,6 +14,7 @@
  */
 
 import fs from "node:fs";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { DATA_DIR } from "./paths";
 import { AUTO_GENERATE_VIZ, MAX_VIZ_GEN_RETRIES } from "./config";
@@ -72,7 +73,7 @@ export function saveSettings(s: AppSettings): void {
   if (s.theme === "light" || s.theme === "dark") {
     file.theme = s.theme;
   }
-  const tmp = `${SETTINGS_PATH}.tmp`;
+  const tmp = `${SETTINGS_PATH}.${randomUUID()}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(file, null, 2));
   fs.renameSync(tmp, SETTINGS_PATH);
 }

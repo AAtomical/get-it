@@ -176,7 +176,7 @@ async function startBuild(docId: string): Promise<KnowledgeGraph> {
       buildError: (e as Error).message,
     };
     saveKG(errored);
-    throw e;
+    return errored;
   }
 }
 

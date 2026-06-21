@@ -357,7 +357,7 @@ function Bubble({
                   {children}
                 </pre>
               ),
-              code: ({ className, children, ...props }) => {
+              code: ({ className, children, node, ...props }) => {
                 const text = String(children);
                 const isInline = !className && !text.includes("\n");
                 return isInline ? (
