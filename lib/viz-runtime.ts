@@ -45,12 +45,63 @@ const FORBIDDEN = [
   "sessionStorage",
 ];
 
-// Captured at module load so they survive the constructor nulling that the
-// compileFn wrapper performs. NOT passed into the new Function body — the
-// model code's closure never sees them.
-const ORIG_FUNC = {}.constructor.constructor;
-const ORIG_ASYNC = Object.getPrototypeOf(async function () {}).constructor;
-const ORIG_GEN = Object.getPrototypeOf(function* () {}).constructor;
+// The constructor-chain escape — `({}).constructor.constructor("code")()` —
+// recovers the real `Function` even though the identifier is shadowed below,
+// which would in turn recover the real `fetch`/`window`/… off the global
+// scope. We block it by temporarily neutralising `constructor` on every
+// function-kind prototype for the synchronous duration of the model code.
+//
+// These descriptors are NOT plain-writable: per spec, AsyncFunction /
+// GeneratorFunction / AsyncGeneratorFunction expose `constructor` as
+// { writable: false, configurable: true }. A direct assignment therefore
+// THROWS in strict mode (the cause of the "Cannot assign to read only
+// property 'constructor' of object '[object AsyncFunction]'" crash). We go
+// through `Object.defineProperty` (allowed because they're configurable) and
+// wrap every step in try/catch so a stricter engine degrades to
+// param-shadowing instead of breaking the render. Captured at module load so
+// the model code's closure never sees the originals.
+const CTOR_TARGETS: Array<{ proto: object; desc: PropertyDescriptor }> = (
+  [
+    ({}).constructor.constructor, // Function
+    Object.getPrototypeOf(async function () {}).constructor, // AsyncFunction
+    Object.getPrototypeOf(function* () {}).constructor, // GeneratorFunction
+    Object.getPrototypeOf(async function* () {}).constructor, // AsyncGeneratorFunction
+  ] as Array<{ prototype: object }>
+)
+  .map((ctor) => {
+    const proto = ctor?.prototype;
+    const desc = proto
+      ? Object.getOwnPropertyDescriptor(proto, "constructor")
+      : undefined;
+    return desc ? { proto, desc } : null;
+  })
+  .filter((t): t is { proto: object; desc: PropertyDescriptor } => t != null);
+
+function neutraliseConstructors(): void {
+  for (const { proto } of CTOR_TARGETS) {
+    try {
+      Object.defineProperty(proto, "constructor", {
+        value: undefined,
+        writable: true,
+        enumerable: false,
+        configurable: true,
+      });
+    } catch {
+      /* engine disallows it — param-shadowing still applies */
+    }
+  }
+}
+
+function restoreConstructors(): void {
+  for (const { proto, desc } of CTOR_TARGETS) {
+    try {
+      Object.defineProperty(proto, "constructor", desc);
+    } catch {
+      /* nothing we can do; leave as-is */
+    }
+  }
+}
+
 const FORBIDDEN_UNDEFS = FORBIDDEN.map(() => undefined);
 
 export type CompiledFn = (api: Record<string, unknown>) => unknown;
@@ -93,19 +144,15 @@ export function compileFn(body: string): CompiledFn {
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
   const fn = new Function(...args, wrapped) as (...args: unknown[]) => unknown;
   return (api: Record<string, unknown>) => {
-    // Null constructors before the model code executes.  The ORIG_*
-    // references are captured at module scope and are *not* passed into
-    // `new Function` — they live only in this closure, which the model
-    // code cannot reach.
-    if (ORIG_FUNC) ORIG_FUNC.prototype.constructor = void 0;
-    if (ORIG_ASYNC) ORIG_ASYNC.prototype.constructor = void 0;
-    if (ORIG_GEN) ORIG_GEN.prototype.constructor = void 0;
+    // Neutralise the constructor chain for the synchronous span of the model
+    // code, then restore the exact original descriptors. Done here (not inside
+    // the new Function body) so the originals never live in a scope the model
+    // code's closure can reach.
+    neutraliseConstructors();
     try {
       return fn(api, ...FORBIDDEN_UNDEFS) as ReturnType<CompiledFn>;
     } finally {
-      if (ORIG_FUNC) ORIG_FUNC.prototype.constructor = ORIG_FUNC;
-      if (ORIG_ASYNC) ORIG_ASYNC.prototype.constructor = ORIG_ASYNC;
-      if (ORIG_GEN) ORIG_GEN.prototype.constructor = ORIG_GEN;
+      restoreConstructors();
     }
   };
 }
