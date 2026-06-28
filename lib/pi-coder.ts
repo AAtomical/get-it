@@ -1,8 +1,9 @@
-import { execFile } from "node:child_process";
+import { execFile, type ChildProcess } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
 import { loadSettings } from "./settings-store";
 import { CodexError } from "./codex-errors";
+import { resolveBundledBinary } from "./providers/cli-runner";
 
 const execFileAsync = promisify(execFile);
 
@@ -10,11 +11,15 @@ export type RunOptions = {
   signal?: AbortSignal;
 };
 
-function getPiExecutionConfig(): { binary: string; preArgs: string[] } {
-  if (process.env.PI_BINARY_PATH) {
-    return { binary: process.env.PI_BINARY_PATH, preArgs: [] };
-  }
-  const cliPath = path.resolve(
+/** Absolute path to the Pi Coding Agent's `dist/cli.js`. */
+function getPiCliPath(): string {
+  // resolveBundledBinary("pi") honours PI_BINARY_PATH (wired by the Electron
+  // main) and the staged electron/pi-bin/pi-cli copy used in the packaged
+  // app and in dev after `electron:prepare`.
+  const resolved = resolveBundledBinary("pi");
+  if (resolved) return resolved;
+  // Source-tree dev fallback: the package as installed in node_modules.
+  return path.resolve(
     process.cwd(),
     "node_modules",
     "@earendil-works",
@@ -22,11 +27,48 @@ function getPiExecutionConfig(): { binary: string; preArgs: string[] } {
     "dist",
     "cli.js",
   );
-  return { binary: "node", preArgs: [cliPath] };
 }
 
 import fs from "node:fs";
 import { DATA_DIR } from "./paths";
+
+/**
+ * Pi's bundled `undici` calls `node:worker_threads.markAsUncloneable`, which
+ * only exists in Node ≥ 22.8. Electron 33 bundles Node 20, and we run Pi
+ * through Electron's own node (process.execPath) — so without this it throws
+ * "webidl.util.markAsUncloneable is not a function". We --require a tiny shim
+ * that defines a no-op before Pi loads undici. No-op is safe: it only skips
+ * marking objects uncloneable for structuredClone, which Pi never relies on.
+ */
+const PI_UNDICI_SHIM = `"use strict";
+try {
+  const wt = require("node:worker_threads");
+  if (typeof wt.markAsUncloneable !== "function") wt.markAsUncloneable = () => {};
+} catch {}
+`;
+
+function ensurePiShim(): string {
+  const shimPath = path.join(DATA_DIR, "pi-undici-shim.cjs");
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(shimPath, PI_UNDICI_SHIM, "utf8");
+  } catch {
+    /* best-effort */
+  }
+  return shimPath;
+}
+
+/**
+ * Pi ships as a pure-JS CLI (like Gemini), so we run its `cli.js` through
+ * Electron's own node (process.execPath) rather than a bare `node` binary —
+ * the packaged app has no system `node` on PATH. The caller sets
+ * ELECTRON_RUN_AS_NODE=1 so Electron executes the script instead of booting
+ * a GUI; in plain Node contexts that var is simply ignored. `--require`s the
+ * undici shim (above) before the CLI loads.
+ */
+function getPiExecutionConfig(): { binary: string; preArgs: string[] } {
+  return { binary: process.execPath, preArgs: ["--require", ensurePiShim(), getPiCliPath()] };
+}
 
 function buildEnvAndProvider(settings: ReturnType<typeof loadSettings>): { env: NodeJS.ProcessEnv; provider: string } {
   const env = { ...process.env };
@@ -74,6 +116,11 @@ function buildEnvAndProvider(settings: ReturnType<typeof loadSettings>): { env: 
   env.PI_OFFLINE = "1";
   env.PI_TELEMETRY = "0";
 
+  // We launch cli.js through Electron's node (process.execPath); this makes
+  // Electron run the script instead of opening a window. Harmless under
+  // plain Node (dev/tests), where the variable is ignored.
+  env.ELECTRON_RUN_AS_NODE = "1";
+
   return { env, provider };
 }
 
@@ -95,31 +142,45 @@ function parseTurnJson<T>(finalResponse: string | undefined): T {
   return JSON.parse(cleaned) as T;
 }
 
-function parsePiNdjson<T>(stdout: string): { data: T; usage: any } {
+type PiContentBlock = { type?: string; text?: string };
+type PiMessage = {
+  role?: string;
+  content?: PiContentBlock[];
+  usage?: unknown;
+  errorMessage?: string;
+};
+type PiEvent = {
+  type?: string;
+  errorMessage?: string;
+  message?: PiMessage;
+  messages?: PiMessage[];
+};
+
+function parsePiNdjson<T>(stdout: string): { data: T; usage: unknown } {
   const lines = stdout.split('\n').filter(l => l.trim().length > 0);
   let assistantText = "";
-  let usage: any = null;
+  let usage: unknown = null;
   let errorMessage = "";
 
   for (const line of lines) {
     try {
-      const event = JSON.parse(line);
+      const event = JSON.parse(line) as PiEvent;
       if (event.errorMessage) {
         errorMessage = event.errorMessage;
       }
       if (event.message?.errorMessage) {
         errorMessage = event.message.errorMessage;
       }
-      
+
       if (event.type === "agent_end" && event.messages) {
          const lastMsg = event.messages[event.messages.length - 1];
          if (lastMsg?.role === "assistant") {
-            const textContent = lastMsg.content?.find((c: any) => c.type === "text")?.text;
+            const textContent = lastMsg.content?.find((c) => c.type === "text")?.text;
             if (textContent) assistantText = textContent;
             if (lastMsg.usage) usage = lastMsg.usage;
          }
       } else if (event.type === "message_end" && event.message?.role === "assistant") {
-         const textContent = event.message.content?.find((c: any) => c.type === "text")?.text;
+         const textContent = event.message.content?.find((c) => c.type === "text")?.text;
          if (textContent) assistantText = textContent;
          if (event.message.usage) usage = event.message.usage;
       }
@@ -140,20 +201,20 @@ function parsePiNdjson<T>(stdout: string): { data: T; usage: any } {
   return { data: parseTurnJson<T>(assistantText), usage };
 }
 
-function logPiProcess(proc: any, label: string) {
+function logPiProcess(proc: ChildProcess | null, label: string) {
+  if (!proc) return;
   const startTime = Date.now();
   let firstTokenTime: number | null = null;
-  let tokenCount = 0;
-  
+
   console.log(`\x1b[35m[Pi Telemetry] [${label}] Starting child process...\x1b[0m`);
 
-  proc.stdout?.on("data", (chunk: any) => {
+  proc.stdout?.on("data", (chunk: Buffer) => {
     const text = chunk.toString();
     const lines = text.split("\n").filter((l: string) => l.trim().length > 0);
-    
+
     for (const line of lines) {
       try {
-        const event = JSON.parse(line);
+        const event = JSON.parse(line) as PiEvent & { content_block_delta?: unknown };
         
         // Log basic events
         if (event.type) {
@@ -167,7 +228,6 @@ function logPiProcess(proc: any, label: string) {
             const ttft = firstTokenTime - startTime;
             console.log(`\x1b[32m[Pi Telemetry] [${label}] Time to First Token (TTFT): ${ttft}ms\x1b[0m`);
           }
-          tokenCount++;
         }
         
         // If there's an error message in the event
@@ -182,7 +242,7 @@ function logPiProcess(proc: any, label: string) {
     }
   });
 
-  proc.stderr?.on("data", (chunk: any) => {
+  proc.stderr?.on("data", (chunk: Buffer) => {
     const text = chunk.toString();
     const lines = text.split("\n").filter((l: string) => l.trim().length > 0);
     for (const line of lines) {
@@ -209,10 +269,12 @@ export async function runJsonPi<T>(
   // Instruct the model to return JSON matching the schema
   const augmentedPrompt = `${prompt}\n\nYou MUST respond ONLY in valid JSON that matches the following schema:\n${JSON.stringify(outputSchema, null, 2)}`;
 
+  // Prompt goes over STDIN (not as a `--print <arg>`): a full-document prompt
+  // would otherwise exceed the OS command-line limit (E2BIG → spawn failure).
   const args = [
     ...preArgs,
     "--mode", "json",
-    "--print", augmentedPrompt,
+    "--print",
     "--provider", provider,
     "--model", model,
     "--no-tools" // Hermetic execution, no side effects
@@ -226,15 +288,17 @@ export async function runJsonPi<T>(
       signal: opts.signal,
       maxBuffer: 10 * 1024 * 1024,
     });
-    
+
     logPiProcess(proc.child, "runJsonPi");
-    
+
+    proc.child.stdin?.write(augmentedPrompt);
     proc.child.stdin?.end();
     const { stdout } = await proc;
     const parsed = parsePiNdjson<T>(stdout);
     return { data: parsed.data, usage: parsed.usage };
-  } catch (err: any) {
-    throw new CodexError("generic", `Pi CLI runJson failed: ${err.message || String(err)}`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new CodexError("generic", `Pi CLI runJson failed: ${message}`);
   }
 }
 
@@ -260,10 +324,11 @@ export async function runJsonInThreadPi<T>(args: {
     throw new Error("runJsonInThreadPi: provide `start` or `resume`");
   }
 
+  // Prompt over STDIN (not `--print <arg>`) to avoid the command-line limit.
   const cliArgs = [
     ...preArgs,
     "--mode", "json",
-    "--print", prompt,
+    "--print",
     "--provider", provider,
     "--model", model,
     "--no-tools"
@@ -286,14 +351,16 @@ export async function runJsonInThreadPi<T>(args: {
       signal: args.opts?.signal,
       maxBuffer: 10 * 1024 * 1024,
     });
-    
+
     logPiProcess(proc.child, "runJsonInThreadPi");
-    
+
+    proc.child.stdin?.write(prompt);
     proc.child.stdin?.end();
     const { stdout } = await proc;
     const parsed = parsePiNdjson<T>(stdout);
     return { data: parsed.data, usage: parsed.usage, threadId };
-  } catch (err: any) {
-    throw new CodexError("generic", `Pi CLI runJsonInThread failed: ${err.message || String(err)}`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new CodexError("generic", `Pi CLI runJsonInThread failed: ${message}`);
   }
 }

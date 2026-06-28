@@ -38,7 +38,8 @@ export async function POST(req: Request) {
     geminiModelSmart: typeof b.geminiModelSmart === "string" ? b.geminiModelSmart : current.geminiModelSmart,
     claudeModelFast: typeof b.claudeModelFast === "string" ? b.claudeModelFast : current.claudeModelFast,
     claudeModelSmart: typeof b.claudeModelSmart === "string" ? b.claudeModelSmart : current.claudeModelSmart,
-    claudeEffort: typeof b.claudeEffort === "string" ? b.claudeEffort : current.claudeEffort,
+    claudeEffortFast: typeof b.claudeEffortFast === "string" ? b.claudeEffortFast : current.claudeEffortFast,
+    claudeEffortSmart: typeof b.claudeEffortSmart === "string" ? b.claudeEffortSmart : current.claudeEffortSmart,
     autoGenerate:
       typeof b.autoGenerate === "boolean" ? b.autoGenerate : current.autoGenerate,
     maxRetries:

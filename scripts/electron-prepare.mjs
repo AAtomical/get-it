@@ -39,8 +39,25 @@ const STANDALONE = path.join(REPO_ROOT, ".next", "standalone");
 const args = process.argv.slice(2);
 const target = args.find((a) => a.startsWith("--target="))?.split("=")[1] ?? null;
 
+/** Read the version of an installed package, or null if it isn't present. */
+function installedVersion(pkg) {
+  try {
+    const pkgJson = path.join(REPO_ROOT, "node_modules", pkg, "package.json");
+    return JSON.parse(fssync.readFileSync(pkgJson, "utf8")).version || null;
+  } catch {
+    return null;
+  }
+}
+
 const REQUIRED_CODEX_VERSION = process.env.CODEX_VERSION || "0.130.0";
-const REQUIRED_CLAUDE_VERSION = process.env.CLAUDE_VERSION || "2.1.169";
+// Pin the per-platform Claude tarballs to whatever @anthropic-ai/claude-code is
+// installed (its optionalDependencies are pinned to the exact same version), so
+// cross-target builds never fetch a mismatched binary. Falls back to a literal
+// only if the package isn't installed (it always is at prepare time).
+const REQUIRED_CLAUDE_VERSION =
+  process.env.CLAUDE_VERSION ||
+  installedVersion("@anthropic-ai/claude-code") ||
+  "2.1.170";
 
 const PLATFORM_PKG_BY_TARGET = {
   "darwin-arm64": "@openai/codex-darwin-arm64",
@@ -108,15 +125,36 @@ async function syncStandaloneAssets() {
   const dstWatch = path.join(STANDALONE, "server-watchdog.cjs");
   await fs.copyFile(srcWatch, dstWatch);
 
-  // Pi Coding Agent CLI needs all its files (like config.js) in standalone
-  const srcPi = path.join(REPO_ROOT, "node_modules", "@earendil-works", "pi-coding-agent");
-  const dstPi = path.join(STANDALONE, "node_modules", "@earendil-works", "pi-coding-agent");
-  await fs.rm(dstPi, { recursive: true, force: true });
-  await copyDir(srcPi, dstPi);
-
   console.log(
-    "[electron-prepare] copied .next/static, public, server-watchdog, and pi-coding-agent into standalone.",
+    "[electron-prepare] copied .next/static, public, and server-watchdog into standalone.",
   );
+}
+
+/**
+ * Stage the Pi Coding Agent CLI the same way Gemini is staged: copy the
+ * whole self-contained package (it ships its own nested node_modules) into
+ * `electron/pi-bin/pi-cli/`. The runtime resolves `dist/cli.js` there and
+ * runs it through Electron's own node (process.execPath) — identical to how
+ * the bundled Gemini `.js` CLI is launched, so Pi works in the packaged app
+ * where no system `node` exists. Pi is pure JS, so one copy serves every
+ * platform (no per-triple fetch, just like gemini-bin).
+ */
+async function stagePiCLI() {
+  const nmDest = path.join(REPO_ROOT, "node_modules", "@earendil-works", "pi-coding-agent");
+  if (!fssync.existsSync(nmDest)) {
+    console.warn("[electron-prepare] pi-coding-agent not found in node_modules, skipping.");
+    return;
+  }
+  const piBinRoot = path.join(REPO_ROOT, "electron", "pi-bin");
+  const piDest = path.join(piBinRoot, "pi-cli");
+  await fs.rm(piBinRoot, { recursive: true, force: true });
+  await fs.mkdir(piBinRoot, { recursive: true });
+  await copyDir(nmDest, piDest);
+  // Drop the `examples/` tree: it ships .ts sources that would otherwise land
+  // in the TS/Next build scope, and it's pure sample code the CLI never needs.
+  // (We keep `docs/`, which Pi references from its own CLI error messages.)
+  await fs.rm(path.join(piDest, "examples"), { recursive: true, force: true });
+  console.log(`[electron-prepare] staged pi cli at electron/pi-bin/pi-cli`);
 }
 
 function downloadBuffer(url, redirectsLeft = 4) {
@@ -339,6 +377,7 @@ async function main() {
     await fetchClaudePackage(effective);
   }
   await stageGeminiCLI();
+  await stagePiCLI();
 }
 
 main().catch((err) => {

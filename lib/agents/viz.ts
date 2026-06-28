@@ -228,9 +228,13 @@ export async function generateVizSpec(args: GenerateVizArgs): Promise<VizSpec> {
     context: args.context,
     docTitle: args.docTitle,
   });
+  // Keep the stable `basePrompt` as the prefix (cache hit across attempts) and
+  // append the variable repair instructions at the END, rather than prepending
+  // them — so a retry still benefits from prefix caching on every engine.
   const initialPrompt = args.previousAttempt
-    ? repairPreamble(args.previousAttempt.spec, args.previousAttempt.runtimeError) +
-      basePrompt
+    ? basePrompt +
+      "\n\n" +
+      repairPreamble(args.previousAttempt.spec, args.previousAttempt.runtimeError)
     : basePrompt;
   const reasoning = args.previousAttempt ? "medium" : "low";
   const webSearch = args.type === "2d-text";

@@ -181,6 +181,9 @@ function resolveBundledBinary(provider) {
     if (provider === "claude") {
       return triple ? ["claude-bin", triple, "claude", isWin ? "claude.exe" : "claude"] : null;
     }
+    if (provider === "pi") {
+      return ["pi-bin", "pi-cli", "dist", "cli.js"];
+    }
     return ["gemini-bin", "gemini-cli", "bundle", "gemini.js"];
   };
 
@@ -217,6 +220,13 @@ function resolveBundledBinary(provider) {
   } else if (provider === "gemini") {
     for (const root of candidateNodeModulesRoots()) {
       const candidate = path.join(root, "@google", "gemini-cli", "bundle", "gemini.js");
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+  } else if (provider === "pi") {
+    for (const root of candidateNodeModulesRoots()) {
+      const candidate = path.join(root, "@earendil-works", "pi-coding-agent", "dist", "cli.js");
       if (fs.existsSync(candidate)) {
         return candidate;
       }
@@ -414,22 +424,23 @@ function ensureIpcHandlers() {
   });
   ipcMain.handle("wizard:login", async (_e, provider) => {
     if (provider === "claude") {
-      const { exec } = require('child_process');
-      const binPath = resolveBundledBinary("claude");
-      if (!binPath) {
-        sendStatus({ phase: "error", message: "Claude CLI binary not found. Installation may be corrupted." });
-        return refreshCodexStatus();
+      // In-app OAuth, mirroring the Codex flow: the binary opens the browser;
+      // we surface the URL as a fallback and detect success by polling status.
+      sendStatus({ phase: "logging-in", message: "Opening browser to sign in…" });
+      try {
+        await runClaudeLogin((line) => {
+          const m = /(https?:\/\/[^\s]+)/i.exec(line);
+          if (m) sendStatus({ phase: "logging-in", message: "Waiting for browser sign-in…", authUrl: m[1] });
+        });
+        sendStatus({ phase: "idle", message: undefined });
+        return { ok: true };
+      } catch (err) {
+        const msg = String(err && err.message ? err.message : err);
+        sendStatus({ phase: "error", message: msg });
+        return { ok: false, error: msg };
       }
-      const isJs = binPath.endsWith(".js");
-      const cmdBin = isJs ? `"${process.execPath}" "${binPath}"` : `"${binPath}"`;
-      const cmd = process.platform === "win32" 
-        ? `start cmd.exe /c ""${cmdBin} auth login & pause""` 
-        : process.platform === "darwin" 
-        ? `osascript -e 'tell app "Terminal" to do script "${cmdBin.replace(/"/g, '\\"')} auth login"'` 
-        : `x-terminal-emulator -e '${cmdBin} auth login' || gnome-terminal -- ${cmdBin} auth login || xterm -e '${cmdBin} auth login'`;
-      exec(cmd);
-      return;
     }
+    // Codex (ChatGPT / OpenAI) browser OAuth.
     sendStatus({ phase: "logging-in", message: "Waiting for browser login…" });
     try {
       const ok = await runCodexLogin((line) => {
@@ -440,10 +451,20 @@ function ensureIpcHandlers() {
         }
       });
       sendStatus({ phase: ok ? "idle" : "error", message: ok ? undefined : "Login did not complete." });
+      return { ok };
     } catch (err) {
       sendStatus({ phase: "error", message: String(err && err.message ? err.message : err) });
+      return { ok: false };
     }
-    return refreshCodexStatus();
+  });
+  ipcMain.handle("wizard:submit-code", (_e, code) => {
+    submitClaudeLoginCode(code);
+  });
+  ipcMain.handle("wizard:verify", async (_e, payload) => {
+    const provider = payload && payload.provider;
+    if (provider === "gemini") return verifyGemini(payload && payload.geminiApiKey);
+    if (provider === "pi") return verifyPi((payload && payload.pi) || {});
+    return { ok: true };
   });
   ipcMain.handle("wizard:open-url", async (_e, url) => {
     if (typeof url === "string" && /^https?:\/\//.test(url)) {
@@ -452,7 +473,11 @@ function ensureIpcHandlers() {
   });
   ipcMain.handle("wizard:finish", (_e, payload) => {
     const override = payload && payload.provider;
-    if (override && override !== "codex") {
+
+    // Persist the chosen provider (+ creds) for EVERY provider — including
+    // codex. Without this, switching *to* codex from another provider closed
+    // the wizard without ever saving provider="codex", so nothing switched.
+    if (override) {
       try {
         const settingsPath = path.join(app.getPath("userData"), "settings.json");
         let settings = { v: 2, autoGenerate: false, maxRetries: 3 };
@@ -460,19 +485,30 @@ function ensureIpcHandlers() {
           try { settings = JSON.parse(fs.readFileSync(settingsPath, "utf8")); } catch {}
         }
         settings.provider = override;
-        if (override !== "pi") {
-          settings.managedProvider = override;
-        }
         if (override === "gemini" && payload.geminiApiKey) {
           settings.geminiApiKey = payload.geminiApiKey;
           process.env.GEMINI_API_KEY = payload.geminiApiKey;
         }
+        if (override === "pi" && payload.pi) {
+          const p = payload.pi;
+          if (p.piProvider) settings.piProvider = p.piProvider;
+          if (p.piUrl) settings.piUrl = p.piUrl;
+          if (typeof p.piApiKey === "string") settings.piApiKey = p.piApiKey;
+          if (p.piApiType) settings.piApiType = p.piApiType;
+          if (p.piModelFast) settings.piModelFast = p.piModelFast;
+          if (p.piModelSmart) settings.piModelSmart = p.piModelSmart;
+        }
         fs.writeFileSync(settingsPath, JSON.stringify(settings));
-      } catch (err) {}
+      } catch (err) { /* ignore */ }
+    }
+
+    if (override && override !== "codex") {
+      // Gemini / Claude / Pi were verified by the wizard before finish.
       closeWizardWindow(true);
       return refreshCodexStatus();
     }
 
+    // Codex: only close once the binary is installed and signed in.
     const status = refreshCodexStatus();
     if (status.binaryFound && status.versionOk && status.loggedIn) {
       closeWizardWindow(true);
@@ -527,8 +563,12 @@ async function showSetupWindow(opts = {}) {
     },
   });
   wizardWindow.removeMenu?.();
+  // Preselect the provider the wizard should open on: the one explicitly
+  // requested, otherwise whatever is currently saved (so "switch provider"
+  // and re-auth open on the right backend instead of always Codex).
+  const initialProvider = opts.provider || readSavedProvider();
   wizardWindow.loadFile(path.join(__dirname, "wizard", "index.html"), {
-    query: { reason: opts.reason || "first-run" },
+    query: { reason: opts.reason || "first-run", provider: initialProvider },
   });
   wizardWindow.once("ready-to-show", () => {
     wizardWindow?.show();
@@ -627,6 +667,271 @@ function runCodexLogin(onLine) {
     });
     child.once("error", reject);
   });
+}
+
+// ── Claude in-app OAuth driver ──────────────────────────────────────────
+// Mirrors the Codex login UX: spawn `claude auth login`, surface the auth URL
+// in the wizard (the binary opens the browser itself), and detect success by
+// polling `claude auth status` — the robust signal, independent of any
+// stdout-format quirks. A code-paste fallback writes to the child's stdin for
+// the rare flow where the browser can't redirect back.
+let claudeLoginChild = null;
+
+function claudeAuthLoggedIn(binPath) {
+  try {
+    const isJs = binPath.endsWith(".js");
+    const cmd = isJs ? process.execPath : binPath;
+    const args = isJs ? [binPath, "auth", "status"] : ["auth", "status"];
+    const r = spawnSync(cmd, args, {
+      encoding: "utf8",
+      timeout: 5000,
+      env: { ...process.env, ...(isJs ? { ELECTRON_RUN_AS_NODE: "1" } : {}) },
+    });
+    const j = JSON.parse((r.stdout || "").trim());
+    return !!j.loggedIn;
+  } catch {
+    return false;
+  }
+}
+
+function runClaudeLogin(onLine) {
+  return new Promise((resolve, reject) => {
+    const binPath = resolveBundledBinary("claude");
+    if (!binPath) {
+      reject(new Error("Claude CLI not available"));
+      return;
+    }
+    // Already signed in → nothing to do.
+    if (claudeAuthLoggedIn(binPath)) {
+      resolve(true);
+      return;
+    }
+    const isJs = binPath.endsWith(".js");
+    const cmd = isJs ? process.execPath : binPath;
+    const args = isJs
+      ? [binPath, "auth", "login", "--claudeai"]
+      : ["auth", "login", "--claudeai"];
+    const child = spawn(cmd, args, {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, ...(isJs ? { ELECTRON_RUN_AS_NODE: "1" } : {}) },
+      windowsHide: true,
+    });
+    claudeLoginChild = child;
+
+    let settled = false;
+    const finish = (ok, err) => {
+      if (settled) return;
+      settled = true;
+      clearInterval(poll);
+      clearTimeout(timeout);
+      try { child.kill(); } catch { /* ignore */ }
+      if (claudeLoginChild === child) claudeLoginChild = null;
+      if (ok) resolve(true);
+      else reject(err || new Error("Claude login did not complete"));
+    };
+
+    const onChunk = (d) => {
+      const text = d.toString("utf8");
+      for (const line of text.split(/\r?\n/)) {
+        if (line.trim()) onLine?.(line);
+      }
+    };
+    child.stdout?.on("data", onChunk);
+    child.stderr?.on("data", onChunk);
+
+    // Poll auth status — succeeds the moment the browser flow lands.
+    const poll = setInterval(() => {
+      if (claudeAuthLoggedIn(binPath)) finish(true);
+    }, 1500);
+
+    child.once("exit", (code) => {
+      setTimeout(() => {
+        if (claudeAuthLoggedIn(binPath)) finish(true);
+        else finish(false, new Error(`claude auth login exited with code ${code}`));
+      }, 400);
+    });
+    child.once("error", (e) => finish(false, e));
+
+    const timeout = setTimeout(
+      () => finish(false, new Error("Login timed out — please try again.")),
+      180000,
+    );
+  });
+}
+
+/** Write a pasted OAuth code to the running `claude auth login` process. */
+function submitClaudeLoginCode(code) {
+  try {
+    if (claudeLoginChild && claudeLoginChild.stdin && code) {
+      claudeLoginChild.stdin.write(String(code).trim() + "\n");
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+// ── Connection verification (run a real tiny call before closing wizard) ──
+// The wizard runs before the embedded server, so we exercise the bundled CLI
+// directly here in main. A passing verify guarantees the provider actually
+// works before the user is allowed to finish — no "looks set up but errors".
+
+function cleanError(s) {
+  // Skip CLI startup/telemetry noise lines; surface the first real message,
+  // and drop the "Full report available at <tmp path>" tail the CLIs append.
+  const lines = String(s || "")
+    .split("\n")
+    .map((l) => l.replace(/\s*Full report available at.*$/i, "").trim())
+    .filter((l) => l.length > 0 && !/^\[(STARTUP|DEBUG|INFO|WARN)\]/i.test(l));
+  const first = lines.find((l) => /error|invalid|denied|unauthor|quota|not found|fail|reach/i.test(l)) || lines[0] || "Verification failed.";
+  return first.length > 180 ? first.slice(0, 177) + "…" : first;
+}
+
+/** Quick TCP reachability probe so we fail fast on a down endpoint. */
+function quickReachable(urlStr, timeoutMs = 4000) {
+  return new Promise((resolve) => {
+    try {
+      const net = require("node:net");
+      const u = new URL(urlStr);
+      const port = u.port ? Number(u.port) : u.protocol === "https:" ? 443 : 80;
+      const sock = net.connect({ host: u.hostname, port });
+      let done = false;
+      const finish = (ok) => {
+        if (done) return;
+        done = true;
+        try { sock.destroy(); } catch { /* ignore */ }
+        resolve(ok);
+      };
+      sock.setTimeout(timeoutMs);
+      sock.once("connect", () => finish(true));
+      sock.once("timeout", () => finish(false));
+      sock.once("error", () => finish(false));
+    } catch {
+      resolve(true); // can't parse URL → let the real call decide
+    }
+  });
+}
+
+function verifyGemini(apiKey) {
+  const bin = resolveBundledBinary("gemini");
+  if (!bin) return { ok: false, error: "Gemini CLI not found in this build." };
+  if (!apiKey || !apiKey.trim()) return { ok: false, error: "Enter your Gemini API key." };
+  const isJs = bin.endsWith(".js");
+  const cmd = isJs ? process.execPath : bin;
+  const args = (isJs ? [bin] : []).concat(["--skip-trust", "--output-format", "json", "--model", "gemini-flash-lite-latest"]);
+  try {
+    // Run from a workspace that forces the API-key auth path (a workspace
+    // setting overrides any saved OAuth selectedType in ~/.gemini).
+    const ws = path.join(app.getPath("userData"), "gemini-verify");
+    fs.mkdirSync(path.join(ws, ".gemini"), { recursive: true });
+    fs.writeFileSync(
+      path.join(ws, ".gemini", "settings.json"),
+      JSON.stringify({ security: { auth: { selectedType: "gemini-api-key" } } }),
+    );
+    const r = spawnSync(cmd, args, {
+      input: "Reply with the single word ok.",
+      encoding: "utf8",
+      timeout: 30000,
+      cwd: ws,
+      env: {
+        ...process.env,
+        GEMINI_API_KEY: apiKey.trim(),
+        GEMINI_CLI_TRUST_WORKSPACE: "true",
+        ...(isJs ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
+      },
+    });
+    if (r.status === 0) return { ok: true };
+    const out = (r.stderr || "") + "\n" + (r.stdout || "");
+    if (/API_KEY_INVALID|API key not valid/i.test(out)) {
+      return { ok: false, error: "That API key isn't valid. Double-check it and try again." };
+    }
+    if (/PERMISSION_DENIED|quota|RESOURCE_EXHAUSTED/i.test(out)) {
+      return { ok: false, error: "The key was accepted but the request was denied (permission or quota). Check your Google AI Studio project." };
+    }
+    return { ok: false, error: cleanError(out || "Gemini rejected the key.") };
+  } catch (e) {
+    return { ok: false, error: cleanError(e && e.message ? e.message : e) };
+  }
+}
+
+async function verifyPi(cfg) {
+  const cliPath = resolveBundledBinary("pi");
+  if (!cliPath) return { ok: false, error: "Pi CLI not found in this build." };
+  const apiType = cfg.piApiType || "openai-completions";
+  const isOllama = cfg.piProvider === "ollama";
+  if (!cfg.piUrl) return { ok: false, error: "Enter the API base URL." };
+  if (!isOllama && !cfg.piApiKey) return { ok: false, error: "Enter your API key for this provider." };
+  // Fail fast (and clearly) when the endpoint isn't even reachable.
+  if (!(await quickReachable(cfg.piUrl))) {
+    return { ok: false, error: `Couldn't reach ${cfg.piUrl}. Is the server running and the URL correct?` };
+  }
+  try {
+    const agentDir = path.join(app.getPath("userData"), "pi-agent");
+    fs.mkdirSync(agentDir, { recursive: true });
+    const env = {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: "1",
+      PI_OFFLINE: "1",
+      PI_TELEMETRY: "0",
+      PI_CODING_AGENT_DIR: agentDir,
+    };
+    if (cfg.piApiKey) {
+      if (apiType === "google-generative-ai") env.GEMINI_API_KEY = cfg.piApiKey;
+      else if (apiType === "anthropic-messages") env.ANTHROPIC_API_KEY = cfg.piApiKey;
+      else env.OPENAI_API_KEY = cfg.piApiKey;
+    }
+    const model = cfg.piModelFast || "llama3.2";
+    const modelsJson = {
+      providers: {
+        getit_byok: {
+          baseUrl: cfg.piUrl,
+          api: apiType,
+          apiKey: cfg.piApiKey || "dummy",
+          models: [{ id: model, reasoning: true }],
+        },
+      },
+    };
+    fs.writeFileSync(path.join(agentDir, "models.json"), JSON.stringify(modelsJson, null, 2));
+    // Shim node:worker_threads.markAsUncloneable for Pi's undici under Node 20.
+    const shimPath = path.join(app.getPath("userData"), "pi-undici-shim.cjs");
+    try {
+      fs.writeFileSync(
+        shimPath,
+        '"use strict";\ntry { const wt = require("node:worker_threads"); if (typeof wt.markAsUncloneable !== "function") wt.markAsUncloneable = () => {}; } catch {}\n',
+      );
+    } catch { /* best-effort */ }
+    const r = spawnSync(
+      process.execPath,
+      ["--require", shimPath, cliPath, "--mode", "json", "--print", "Reply with the single word ok.", "--provider", "getit_byok", "--model", model, "--no-tools"],
+      { env, encoding: "utf8", timeout: 45000 },
+    );
+    let errMsg = "";
+    let gotText = false;
+    for (const line of (r.stdout || "").split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        const ev = JSON.parse(line);
+        if (ev.errorMessage) errMsg = ev.errorMessage;
+        if (ev.message && ev.message.errorMessage) errMsg = ev.message.errorMessage;
+        if (ev.type === "message_end" || ev.type === "agent_end") gotText = true;
+      } catch {
+        /* non-json line */
+      }
+    }
+    if (gotText && !errMsg) return { ok: true };
+    const blob = (errMsg || "") + "\n" + (r.stderr || "");
+    if (/ECONNREFUSED|fetch failed|ENOTFOUND|ECONNRESET|socket hang up/i.test(blob)) {
+      return { ok: false, error: `Couldn't reach ${cfg.piUrl}. Is the server running?` };
+    }
+    if (/\b401\b|invalid api key|unauthor|forbidden|\b403\b/i.test(blob)) {
+      return { ok: false, error: "The endpoint rejected the API key." };
+    }
+    if (/\b404\b|model.*not found|no such model|not found.*model/i.test(blob)) {
+      return { ok: false, error: `Model "${model}" wasn't found at this endpoint.` };
+    }
+    return { ok: false, error: cleanError(errMsg || r.stderr || "Could not complete a test call.") };
+  } catch (e) {
+    return { ok: false, error: cleanError(e && e.message ? e.message : e) };
+  }
 }
 
 // ── Status snapshot + subscribers ───────────────────────────────────────
@@ -735,29 +1040,19 @@ function resolveCliOnPath(binaryName) {
  */
 function isCliAuthenticated(binaryPath, provider) {
   if (provider === "claude") {
-    try {
-      const isJs = binaryPath.endsWith(".js");
-      const bin = isJs ? process.execPath : binaryPath;
-      const args = isJs ? [binaryPath, "auth", "status"] : ["auth", "status"];
-      const r = spawnSync(bin, args, {
-        encoding: "utf8",
-        timeout: 5000,
-        shell: process.platform === "win32",
-      });
-      return r.status === 0;
-    } catch {
-      return false;
-    }
+    // `auth status` exits 0 even when signed out — parse the JSON `loggedIn`.
+    return claudeAuthLoggedIn(binaryPath);
   }
   if (provider === "gemini") {
-    // Gemini doesn't have a dedicated auth check — a successful --version
-    // is a reasonable proxy.
+    // Gemini is API-key only — Google retired the free-tier browser login.
     try {
-      const credsPath = path.join(os.homedir(), ".gemini", "gemini-credentials.json");
-      return fs.existsSync(credsPath);
-    } catch {
-      return false;
-    }
+      const settingsPath = path.join(app.getPath("userData"), "settings.json");
+      if (fs.existsSync(settingsPath)) {
+        const raw = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+        return !!raw.geminiApiKey;
+      }
+    } catch { /* ignore */ }
+    return false;
   }
   return false;
 }

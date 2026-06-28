@@ -346,16 +346,21 @@ export function requestVizGeneration(
   tagId: string,
   runtimeError?: string,
 ): void {
+  const maxRetries = loadSettings().maxRetries;
   mergeTagsFile(docId, (file) => ({
     ...file,
     tags: file.tags.map((t) => {
       if (t.id !== tagId) return t;
-      if (runtimeError) {
+      const attemptsSoFar = t.attempts ?? 0;
+      // A runtime error feeds the failing code back to the agent for a repair
+      // pass (processViz reads `spec` + `lastRuntimeError` as previousAttempt).
+      // Once the retry budget is exhausted, give up with a permanent error.
+      if (runtimeError && attemptsSoFar > maxRetries) {
         return {
           ...t,
           ready: false,
           generating: false,
-          error: runtimeError,
+          error: `Couldn't render this concept — the agent's code kept failing after ${attemptsSoFar} attempts.`,
           lastRuntimeError: runtimeError,
         };
       }
@@ -364,7 +369,9 @@ export function requestVizGeneration(
         ready: false,
         generating: true,
         error: undefined,
-        lastRuntimeError: undefined,
+        // Preserve the runtime error so the repair pass has context; on a
+        // plain (re)generate click, keep whatever was already recorded.
+        lastRuntimeError: runtimeError ?? t.lastRuntimeError,
       };
     }),
   }));

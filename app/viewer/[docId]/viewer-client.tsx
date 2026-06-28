@@ -532,7 +532,7 @@ export default function ViewerClient({ docId }: { docId: string }) {
               emptyHint: activeTag?.error
                 ? "We weren't able to build a working visualization for this concept. Retry below, or pick another tag — most of them work cleanly."
                 : tags.length === 0
-                  ? "codex is reading the document — tags will appear inline as soon as they're detected."
+                  ? `${PROVIDER_LABELS[provider]} is reading the document — tags will appear inline as soon as they're detected.`
                   : autoGenerate
                     ? "Click any colored tag in the document to render its concept here."
                     : "Click any tag to generate its visualization. (manual mode — toggle auto-generate in settings)",

@@ -18,7 +18,8 @@ import {
   type CodexAccountInfo,
   type CodexRateLimits,
 } from "@/lib/codex-account";
-import { whichBinary, augmentedPath } from "@/lib/providers/cli-runner";
+import { whichBinary, augmentedPath, resolveBundledBinary } from "@/lib/providers/cli-runner";
+import { readUsage, type ProviderUsage } from "@/lib/usage-store";
 
 export const runtime = "nodejs";
 
@@ -29,58 +30,68 @@ type ProviderStatus = {
   installed: boolean;
   authenticated: boolean;
   version: string | null;
+  /** "account" → show plan/limits; "apiKey" → show token usage. */
+  authMode: "account" | "apiKey" | null;
   // Codex-specific fields (null for other providers)
   account: CodexAccountInfo | null;
   rateLimits: CodexRateLimits | null;
+  /** Cumulative token usage (shown for apiKey providers; informational for account). */
+  usage: ProviderUsage | null;
 };
 
-function checkCliAuth(binary: string, provider: ProviderName): boolean {
-  if (provider === "claude") {
-    // claude auth status — exit code 0 = logged in
-    try {
-      const isJs = binary.endsWith(".js");
-      const bin = isJs ? process.execPath : binary;
-      const args = isJs ? [binary, "auth", "status"] : ["auth", "status"];
-      const r = spawnSync(bin, args, {
-        encoding: "utf8",
-        timeout: 5000,
-        env: { ...process.env, PATH: augmentedPath() },
-        shell: process.platform === "win32",
-      });
-      return r.status === 0;
-    } catch {
-      return false;
-    }
-  }
+/**
+ * Spawn a bundled or PATH CLI. `.js` bundles (Gemini) run through Electron's
+ * own node via process.execPath + ELECTRON_RUN_AS_NODE=1; native binaries
+ * (Claude) run directly.
+ */
+function spawnCli(binary: string, args: string[]) {
+  const isJs = binary.endsWith(".js");
+  const bin = isJs ? process.execPath : binary;
+  const finalArgs = isJs ? [binary, ...args] : args;
+  return spawnSync(bin, finalArgs, {
+    encoding: "utf8",
+    timeout: 6000,
+    env: {
+      ...process.env,
+      PATH: augmentedPath(),
+      ...(isJs ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
+    },
+    shell: false,
+  });
+}
 
-  if (provider === "gemini") {
-    const settings = loadSettings();
-    if (settings.geminiApiKey) return true;
-    try {
-      const os = require("os");
-      const path = require("path");
-      const fs = require("fs");
-      const credsPath = path.join(os.homedir(), ".gemini", "gemini-credentials.json");
-      return fs.existsSync(credsPath);
-    } catch {
-      return false;
-    }
-  }
+type ClaudeAuthStatus = {
+  loggedIn: boolean;
+  email: string | null;
+  authMethod: string | null;
+  subscriptionType: string | null;
+};
 
-  return false;
+/** Read `claude auth status` output (the CLI emits JSON). */
+function readClaudeAuthStatus(binary: string): ClaudeAuthStatus {
+  try {
+    const r = spawnCli(binary, ["auth", "status"]);
+    const out = (r.stdout || "").trim();
+    const j = JSON.parse(out) as {
+      loggedIn?: boolean;
+      email?: string;
+      authMethod?: string;
+      subscriptionType?: string;
+    };
+    return {
+      loggedIn: !!j.loggedIn,
+      email: j.email ?? null,
+      authMethod: j.authMethod ?? null,
+      subscriptionType: j.subscriptionType ?? null,
+    };
+  } catch {
+    return { loggedIn: false, email: null, authMethod: null, subscriptionType: null };
+  }
 }
 
 function getCliVersion(binary: string): string | null {
   try {
-    const isJs = binary.endsWith(".js");
-    const bin = isJs ? process.execPath : binary;
-    const args = isJs ? [binary, "--version"] : ["--version"];
-    const r = spawnSync(bin, args, {
-      encoding: "utf8",
-      timeout: 5000,
-      env: { ...process.env, PATH: augmentedPath() },
-      shell: process.platform === "win32",
-    });
+    const r = spawnCli(binary, ["--version"]);
     if (r.status !== 0) return null;
     const out = (r.stdout || "").trim();
     // Extract version number from output
@@ -97,8 +108,9 @@ export async function GET() {
   const label = PROVIDER_LABELS[provider];
   const docsUrl = PROVIDER_DOCS[provider];
 
+  const usage = readUsage(provider);
+
   if (provider === "codex") {
-    // Full Codex account info
     const account: CodexAccountInfo | null = (() => {
       try {
         return readAccountInfo();
@@ -106,52 +118,109 @@ export async function GET() {
         return null;
       }
     })();
+    // Codex on an API key (auth_mode !== "chatgpt") has no readable limits →
+    // show token usage instead; ChatGPT login shows subscription limits.
+    const isApiKey = !!account && account.authMode != null && account.authMode !== "chatgpt";
     let limits: CodexRateLimits | null = null;
-    try {
-      limits = await readRateLimits();
-    } catch {
-      limits = null;
+    if (!isApiKey) {
+      try {
+        limits = await readRateLimits();
+      } catch {
+        limits = null;
+      }
     }
     const status: ProviderStatus = {
       provider,
       label,
       docsUrl,
-      installed: true, // if we got here, Codex SDK is available
+      installed: true,
       authenticated: !!account?.email,
       version: null,
+      authMode: isApiKey ? "apiKey" : "account",
       account,
       rateLimits: limits,
+      usage,
     };
     return NextResponse.json(status);
   }
 
   if (provider === "pi") {
+    // A real BYOK config: an endpoint, plus a key for any remote provider
+    // (Ollama runs locally and needs none). Avoids showing "connected" just
+    // because the default localhost URL is present.
+    const configured =
+      !!settings.piUrl && (settings.piProvider === "ollama" || !!settings.piApiKey);
     const status: ProviderStatus = {
       provider,
       label,
       docsUrl,
       installed: true,
-      authenticated: !!settings.piUrl,
+      authenticated: configured,
       version: null,
-      account: !!settings.piUrl ? {
-        email: "BYOK Connection",
-        name: "Pi Backend",
-        planType: "Proxy",
-        organizations: [],
-        subscriptionActiveUntil: null,
-        authMode: "URL/Key",
-      } : null,
+      authMode: "apiKey",
+      account: configured
+        ? {
+            email: settings.piUrl ?? null,
+            name: "Your own key (BYOK)",
+            planType: settings.piProvider ?? "Custom",
+            organizations: [],
+            subscriptionActiveUntil: null,
+            authMode: "BYOK",
+          }
+        : null,
       rateLimits: null,
+      usage,
     };
     return NextResponse.json(status);
   }
 
-  // Gemini / Claude — stub status
-  const binaryName = provider === "gemini" ? "gemini" : "claude";
-  const binaryPath = whichBinary(binaryName);
+  // Gemini / Claude — resolve the BUNDLED CLI first (not on $PATH when packaged),
+  // falling back to a PATH lookup for source-tree dev.
+  const binaryPath =
+    resolveBundledBinary(provider as "gemini" | "claude") ??
+    whichBinary(provider === "gemini" ? "gemini" : "claude");
   const installed = !!binaryPath;
-  const authenticated = installed ? checkCliAuth(binaryPath, provider) : false;
-  const version = installed ? getCliVersion(binaryPath) : null;
+  const version = installed && binaryPath ? getCliVersion(binaryPath) : null;
+
+  let authenticated = false;
+  let account: ProviderStatus["account"] = null;
+  let authMode: ProviderStatus["authMode"] = null;
+
+  if (provider === "claude" && binaryPath) {
+    // Rich, accurate status straight from `claude auth status` JSON.
+    const auth = readClaudeAuthStatus(binaryPath);
+    authenticated = auth.loggedIn;
+    // firstParty = claude.ai subscription; anything else = Console/API key.
+    authMode = auth.authMethod === "claude.ai" ? "account" : "apiKey";
+    if (auth.loggedIn) {
+      account = {
+        email: auth.email,
+        name: auth.email ?? "Claude account",
+        // Show the real plan (max / pro / team), like Codex shows plus/pro.
+        planType:
+          authMode === "account"
+            ? auth.subscriptionType ?? "Subscription"
+            : "API (Console)",
+        organizations: [],
+        subscriptionActiveUntil: null,
+        authMode: auth.authMethod,
+      };
+    }
+  } else if (provider === "gemini") {
+    // Gemini is API-key only — Google retired the free-tier browser login.
+    authMode = "apiKey";
+    authenticated = !!settings.geminiApiKey;
+    if (authenticated) {
+      account = {
+        email: "Gemini (API key)",
+        name: "Gemini",
+        planType: "API key",
+        organizations: [],
+        subscriptionActiveUntil: null,
+        authMode: "API Key",
+      };
+    }
+  }
 
   const status: ProviderStatus = {
     provider,
@@ -160,15 +229,10 @@ export async function GET() {
     installed,
     authenticated,
     version,
-    account: authenticated ? {
-      email: provider === "gemini" ? "Google Account (via API Key)" : "Anthropic Account",
-      name: provider === "gemini" ? "Gemini Developer" : "Claude Developer",
-      planType: provider === "gemini" ? "API Access" : "Console / Pro",
-      organizations: [],
-      subscriptionActiveUntil: null,
-      authMode: provider === "gemini" ? "API Key" : "CLI Auth",
-    } : null,
+    authMode,
+    account,
     rateLimits: null,
+    usage,
   };
   return NextResponse.json(status);
 }

@@ -14,7 +14,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { runJsonInThread, CodexError } from "@/lib/codex";
+import { runJsonInThread, CodexError, getActiveProviderName } from "@/lib/codex";
 import { getDoc } from "@/lib/store";
 import {
   loadWorkContext,
@@ -24,6 +24,7 @@ import {
 } from "@/lib/work-context";
 import { chatReplySchema, type ChatReplyResult } from "@/lib/schemas-kg";
 import { loadKG } from "@/lib/kg";
+import type { ProviderName } from "@/lib/provider-types";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -132,34 +133,42 @@ export async function POST(
     // wire when resuming an existing Codex thread.
     const turnInput = `STUDENT: ${message}\n\n--- ASSISTANT REPLY ---\nReply now as ASSISTANT. Output JSON.`;
 
+    const activeProvider = getActiveProviderName();
     let reply: ChatReplyResult | null = null;
     let codexThreadId: string | null = chat.codexThreadId ?? null;
+    let threadProvider: ProviderName | null = chat.threadProvider ?? null;
 
-    // Resume the conversation's native Codex thread when we have one: the
-    // document + prior turns already live in that thread, so we send only the
-    // new message (guaranteed prefix-cache hit, a fraction of the tokens).
-    if (chat.codexThreadId) {
+    // Resume the engine's native thread ONLY when it was minted by the engine
+    // that's active right now — a thread id is provider-specific. The document
+    // + prior turns already live in that thread, so we send only the new
+    // message (a prefix-cache hit, a fraction of the tokens). If the user
+    // switched providers, we skip resume entirely and migrate transparently
+    // below (no wasted cross-provider resume call, no error-string guessing).
+    const canResume = !!chat.codexThreadId && chat.threadProvider === activeProvider;
+    if (canResume) {
       try {
         const { data, threadId } = await runJsonInThread<ChatReplyResult>({
           outputSchema: chatReplySchema,
           opts: { reasoning: "low" },
-          resume: { threadId: chat.codexThreadId, input: turnInput },
+          resume: { threadId: chat.codexThreadId!, input: turnInput },
         });
         reply = data;
-        codexThreadId = threadId ?? chat.codexThreadId;
+        codexThreadId = threadId ?? chat.codexThreadId!;
+        threadProvider = activeProvider;
       } catch (e) {
         // Rate-limit / auth / binary: let the health banner take over.
         if (e instanceof CodexError && e.kind !== "generic") throw e;
-        // Generic failure (e.g. the session expired / was evicted from
-        // ~/.codex/sessions): fall through and rebuild a fresh thread with
-        // full context so the answer never silently degrades.
+        // Generic failure (e.g. the session expired / was evicted): fall
+        // through and rebuild a fresh thread with full context so the answer
+        // never silently degrades.
         reply = null;
       }
     }
 
-    // No thread yet (first turn) or the resume failed: open a fresh thread and
-    // seed it with the full context — system prompt + whole document + the
-    // conversation so far. Stable prefix first, the latest turn last.
+    // No usable thread (first turn, provider switched, or resume failed): open
+    // a fresh thread and seed it with the full context — system prompt + whole
+    // document + the conversation so far. Stable prefix first, latest turn last.
+    // This is the transparent migration: the new engine sees the entire history.
     if (!reply) {
       const fullInput = `${SYSTEM}\n\n${docContext(docId)}\n\n--- CONVERSATION SO FAR ---\n${renderHistory(
         messagesForPrompt,
@@ -171,6 +180,7 @@ export async function POST(
       });
       reply = data;
       codexThreadId = threadId;
+      threadProvider = activeProvider;
     }
 
     // Codex succeeded — commit the user turn and the reply atomically.
@@ -188,7 +198,15 @@ export async function POST(
     }
     liveChat.messages.push(userMsg, assistantMsg);
     liveChat.updatedAt = assistantMsg.ts;
-    if (codexThreadId) liveChat.codexThreadId = codexThreadId;
+    if (codexThreadId) {
+      liveChat.codexThreadId = codexThreadId;
+      liveChat.threadProvider = threadProvider ?? activeProvider;
+    } else {
+      // No native thread this turn (e.g. Gemini) — drop any stale id so the
+      // next turn rebuilds full context instead of resuming a dead thread.
+      liveChat.codexThreadId = undefined;
+      liveChat.threadProvider = undefined;
+    }
     saveWorkContext(reloaded);
 
     // NB: the knowledge-graph evaluation is intentionally NOT scheduled here.

@@ -34,7 +34,8 @@ export type SettingsPayload = {
   geminiModelSmart?: string;
   claudeModelFast?: string;
   claudeModelSmart?: string;
-  claudeEffort?: string;
+  claudeEffortFast?: string;
+  claudeEffortSmart?: string;
   piUrl?: string;
   piApiKey?: string;
   piModelFast?: string;
@@ -44,6 +45,13 @@ export type SettingsPayload = {
 };
 
 export const SETTINGS_EVENT = "getit:settings";
+
+const ENGINE_LABEL: Record<ProviderName, string> = {
+  codex: "OpenAI — Codex CLI",
+  gemini: "Google — Gemini (API key)",
+  claude: "Anthropic — Claude Code",
+  pi: "Bring your own key (BYOK)",
+};
 
 function EditableModelSelect({ 
   label, 
@@ -171,11 +179,12 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
   const [codexEffortFast, setCodexEffortFast] = useState<string>("low");
   const [codexEffortSmart, setCodexEffortSmart] = useState<string>("high");
   const [geminiApiKey, setGeminiApiKey] = useState<string>("");
-  const [geminiModelFast, setGeminiModelFast] = useState<string>("gemini-2.5-flash");
-  const [geminiModelSmart, setGeminiModelSmart] = useState<string>("gemini-2.5-pro");
-  const [claudeModelFast, setClaudeModelFast] = useState<string>("claude-3-7-sonnet-20250219");
-  const [claudeModelSmart, setClaudeModelSmart] = useState<string>("claude-3-7-sonnet-20250219");
-  const [claudeEffort, setClaudeEffort] = useState<string>("medium");
+  const [geminiModelFast, setGeminiModelFast] = useState<string>("gemini-flash-latest");
+  const [geminiModelSmart, setGeminiModelSmart] = useState<string>("gemini-pro-latest");
+  const [claudeModelFast, setClaudeModelFast] = useState<string>("sonnet");
+  const [claudeModelSmart, setClaudeModelSmart] = useState<string>("opus");
+  const [claudeEffortFast, setClaudeEffortFast] = useState<string>("medium");
+  const [claudeEffortSmart, setClaudeEffortSmart] = useState<string>("high");
 
   // PI specific
   const [piUrl, setPiUrl] = useState<string>("http://localhost:11434/v1");
@@ -194,7 +203,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
     let cancelled = false;
     fetch("/api/settings", { cache: "no-store" })
       .then((r) => r.json())
-      .then((s: any) => {
+      .then((s: Partial<SettingsPayload>) => {
         if (cancelled) return;
         if (typeof s.autoGenerate === "boolean") setAutoGenerate(s.autoGenerate);
         if (typeof s.maxRetries === "number") setMaxRetries(s.maxRetries);
@@ -208,7 +217,8 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
         if (typeof s.geminiModelSmart === "string") setGeminiModelSmart(s.geminiModelSmart);
         if (typeof s.claudeModelFast === "string") setClaudeModelFast(s.claudeModelFast);
         if (typeof s.claudeModelSmart === "string") setClaudeModelSmart(s.claudeModelSmart);
-        if (typeof s.claudeEffort === "string") setClaudeEffort(s.claudeEffort);
+        if (typeof s.claudeEffortFast === "string") setClaudeEffortFast(s.claudeEffortFast);
+        if (typeof s.claudeEffortSmart === "string") setClaudeEffortSmart(s.claudeEffortSmart);
         if (typeof s.piUrl === "string") setPiUrl(s.piUrl);
         if (typeof s.piApiKey === "string") setPiApiKey(s.piApiKey);
         if (typeof s.piModelFast === "string") setPiModelFast(s.piModelFast);
@@ -312,18 +322,18 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
     });
   }, [piUrl, piApiType, piModelFast, piModelSmart, persist]);
 
-  const textStateRef = useRef({ piUrl, piApiKey, piModelFast, piModelSmart, codexModelFast, codexModelSmart, codexEffortFast, codexEffortSmart, geminiApiKey, geminiModelFast, geminiModelSmart, claudeModelFast, claudeModelSmart, claudeEffort });
+  const textStateRef = useRef({ piUrl, piApiKey, piModelFast, piModelSmart, codexModelFast, codexModelSmart, codexEffortFast, codexEffortSmart, geminiApiKey, geminiModelFast, geminiModelSmart, claudeModelFast, claudeModelSmart, claudeEffortFast, claudeEffortSmart });
   useEffect(() => {
-    textStateRef.current = { piUrl, piApiKey, piModelFast, piModelSmart, codexModelFast, codexModelSmart, codexEffortFast, codexEffortSmart, geminiApiKey, geminiModelFast, geminiModelSmart, claudeModelFast, claudeModelSmart, claudeEffort };
-  }, [piUrl, piApiKey, piModelFast, piModelSmart, codexModelFast, codexModelSmart, codexEffortFast, codexEffortSmart, geminiApiKey, geminiModelFast, geminiModelSmart, claudeModelFast, claudeModelSmart, claudeEffort]);
+    textStateRef.current = { piUrl, piApiKey, piModelFast, piModelSmart, codexModelFast, codexModelSmart, codexEffortFast, codexEffortSmart, geminiApiKey, geminiModelFast, geminiModelSmart, claudeModelFast, claudeModelSmart, claudeEffortFast, claudeEffortSmart };
+  }, [piUrl, piApiKey, piModelFast, piModelSmart, codexModelFast, codexModelSmart, codexEffortFast, codexEffortSmart, geminiApiKey, geminiModelFast, geminiModelSmart, claudeModelFast, claudeModelSmart, claudeEffortFast, claudeEffortSmart]);
 
   useEffect(() => {
     if (!hydratedRef.current) return;
     const timer = setTimeout(() => {
-      persist({ piUrl, piApiKey, piModelFast, piModelSmart, codexModelFast, codexModelSmart, codexEffortFast, codexEffortSmart, geminiApiKey, geminiModelFast, geminiModelSmart, claudeModelFast, claudeModelSmart, claudeEffort });
+      persist({ piUrl, piApiKey, piModelFast, piModelSmart, codexModelFast, codexModelSmart, codexEffortFast, codexEffortSmart, geminiApiKey, geminiModelFast, geminiModelSmart, claudeModelFast, claudeModelSmart, claudeEffortFast, claudeEffortSmart });
     }, 500);
     return () => clearTimeout(timer);
-  }, [piUrl, piApiKey, piModelFast, piModelSmart, codexModelFast, codexModelSmart, codexEffortFast, codexEffortSmart, geminiApiKey, geminiModelFast, geminiModelSmart, claudeModelFast, claudeModelSmart, claudeEffort, persist]);
+  }, [piUrl, piApiKey, piModelFast, piModelSmart, codexModelFast, codexModelSmart, codexEffortFast, codexEffortSmart, geminiApiKey, geminiModelFast, geminiModelSmart, claudeModelFast, claudeModelSmart, claudeEffortFast, claudeEffortSmart, persist]);
 
   useEffect(() => {
     return () => {
@@ -364,20 +374,21 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
 
       <div className="px-3 py-2 border-b border-[var(--border-subtle)]">
         <label className="block text-[12.5px] font-medium text-[var(--ink-900)] mb-2">Model Engine</label>
-        <select
-          value={provider}
-          onChange={(e) => {
-            const next = e.target.value as ProviderName;
-            setProvider(next);
-            persist({ provider: next });
-          }}
-          className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1.5 text-[12px] font-medium text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
-        >
-          <option value="codex">OpenAI (Codex CLI)</option>
-          <option value="gemini">Google Gemini (Gemini CLI)</option>
-          <option value="claude">Anthropic (Claude Code)</option>
-          <option value="pi">Pi Coder (BYOK)</option>
-        </select>
+        {/* Switching engines goes through the setup wizard only — it installs/
+            authenticates the new backend and verifies it works before applying.
+            A free-floating dropdown here would bypass that and leave a broken
+            provider selected, so we show the current engine + a guided Switch. */}
+        <div className="flex items-center justify-between gap-2 rounded-md border border-[var(--border-subtle)] bg-white px-2.5 py-1.5">
+          <span className="text-[12px] font-medium text-[var(--ink-900)]">{ENGINE_LABEL[provider]}</span>
+          <button
+            type="button"
+            onClick={() => window.getit?.runCodexSetup?.().catch(() => {})}
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1 text-[10.5px] font-medium text-[var(--ink-700)] transition hover:border-[var(--accent-300)] hover:text-[var(--accent-700)]"
+          >
+            <Settings2 className="h-2.5 w-2.5" />
+            Switch
+          </button>
+        </div>
       </div>
 
       {provider === "gemini" && (
@@ -430,7 +441,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
               Claude Authentication
             </label>
             <p className="text-[11px] leading-relaxed text-[var(--ink-500)]">
-              Claude Code uses terminal-based auth. Ensure you ran <code>claude auth login</code>.
+              Sign in with one click from the <strong>Account</strong> menu (top-right). Aliases like <code>sonnet</code> or <code>haiku</code> always map to the current model.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -439,14 +450,9 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
               value={claudeModelFast}
               onChange={setClaudeModelFast}
               options={[
-                { value: "claude-3-7-sonnet-20250219", label: "claude-3-7-sonnet" },
-                { value: "fable-5", label: "fable-5" },
-                { value: "opus-4.8", label: "opus-4.8" },
-                { value: "opus-4.7", label: "opus-4.7" },
-                { value: "opus-4.6", label: "opus-4.6" },
-                { value: "sonnet-4.6", label: "sonnet-4.6" },
-                { value: "claude-3-5-sonnet-20241022", label: "claude-3-5-sonnet" },
-                { value: "claude-3-5-haiku-20241022", label: "claude-3-5-haiku" }
+                { value: "sonnet", label: "sonnet (recommended)" },
+                { value: "haiku", label: "haiku (fastest)" },
+                { value: "opus", label: "opus (most capable)" }
               ]}
             />
             <EditableModelSelect
@@ -454,29 +460,41 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
               value={claudeModelSmart}
               onChange={setClaudeModelSmart}
               options={[
-                { value: "claude-3-7-sonnet-20250219", label: "claude-3-7-sonnet" },
-                { value: "fable-5", label: "fable-5" },
-                { value: "opus-4.8", label: "opus-4.8" },
-                { value: "opus-4.7", label: "opus-4.7" },
-                { value: "opus-4.6", label: "opus-4.6" },
-                { value: "sonnet-4.6", label: "sonnet-4.6" },
-                { value: "claude-3-opus-20240229", label: "claude-3-opus" }
+                { value: "sonnet", label: "sonnet (recommended)" },
+                { value: "opus", label: "opus (most capable)" },
+                { value: "haiku", label: "haiku (fastest)" }
               ]}
             />
-            <div className="col-span-2">
+            <div>
               <label className="block text-[11px] font-medium text-[var(--ink-900)] mb-1">
-                Claude Thinking Effort
+                Fast Thinking Effort
               </label>
               <select
-                value={claudeEffort}
-                onChange={(e) => setClaudeEffort(e.target.value)}
+                value={claudeEffortFast}
+                onChange={(e) => setClaudeEffortFast(e.target.value)}
                 className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1.5 text-[11px] text-[var(--ink-900)] shadow-sm focus:border-[var(--accent-500)] focus:outline-none"
               >
-                <option value="low">low</option>
-                <option value="medium">medium</option>
-                <option value="high">high</option>
-                <option value="xhigh">xhigh</option>
-                <option value="max">max</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium (Default for fast)</option>
+                <option value="high">High</option>
+                <option value="xhigh">X-High</option>
+                <option value="max">Max</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-[var(--ink-900)] mb-1">
+                Smart Thinking Effort
+              </label>
+              <select
+                value={claudeEffortSmart}
+                onChange={(e) => setClaudeEffortSmart(e.target.value)}
+                className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1.5 text-[11px] text-[var(--ink-900)] shadow-sm focus:border-[var(--accent-500)] focus:outline-none"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High (Default for smart)</option>
+                <option value="xhigh">X-High</option>
+                <option value="max">Max</option>
               </select>
             </div>
           </div>
@@ -570,7 +588,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
             </label>
             <select
               value={piProvider}
-              onChange={(e) => handlePiProviderChange(e.target.value as any)}
+              onChange={(e) => handlePiProviderChange(e.target.value as NonNullable<SettingsPayload["piProvider"]>)}
               className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1.5 text-[12px] font-medium text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
             >
               <option value="ollama">Ollama (Local)</option>
@@ -587,8 +605,8 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
             <select
               value={piApiType}
               onChange={(e) => {
-                setPiApiType(e.target.value as any);
-                persist({ piApiType: e.target.value as any });
+                setPiApiType(e.target.value as NonNullable<SettingsPayload["piApiType"]>);
+                persist({ piApiType: e.target.value as NonNullable<SettingsPayload["piApiType"]> });
               }}
               className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1.5 text-[12px] font-medium text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
             >

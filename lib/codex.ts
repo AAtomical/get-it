@@ -24,12 +24,14 @@
 import { loadSettings } from "./settings-store";
 import type { AIProvider, RunOptions as ProviderRunOptions } from "./provider-types";
 import type { ProviderName } from "./provider-types";
+import { PROVIDER_LABELS } from "./provider-types";
 import { CodexProvider } from "./providers/codex-provider";
 import { GeminiProvider } from "./providers/gemini-provider";
 import { ClaudeProvider } from "./providers/claude-provider";
 import { PiProvider } from "./providers/pi-provider";
-import { CodexError, classifyCodexError } from "./codex-errors";
+import { CodexError, classifyCodexError, toCodexErrorPayload as toErrorPayloadBase } from "./codex-errors";
 import type { CodexErrorKind } from "./codex-errors";
+import { recordUsage, normalizeUsage } from "./usage-store";
 
 // Re-export RunOptions from here so existing imports keep working.
 // Add back the threadOverrides for Codex-specific callers.
@@ -42,8 +44,22 @@ export type RunOptions = ProviderRunOptions & {
 export {
   CodexError,
   classifyCodexError,
-  toCodexErrorPayload,
 } from "./codex-errors";
+
+/**
+ * Provider-aware error payload: fills the friendly message with the ACTIVE
+ * engine's label (so the UI says "Claude Code"/"Gemini CLI"/… instead of a
+ * hard-coded "Codex"). All API routes import this from here.
+ */
+export function toCodexErrorPayload(err: unknown): { kind: CodexErrorKind; message: string } {
+  let label = "the AI engine";
+  try {
+    label = PROVIDER_LABELS[loadSettings().provider] ?? label;
+  } catch {
+    /* fall back to the generic label */
+  }
+  return toErrorPayloadBase(err, label);
+}
 export type { CodexErrorKind } from "./codex-errors";
 
 // ── Provider singletons ─────────────────────────────────────────────────
@@ -149,6 +165,39 @@ function preflightHealth(providerName: ProviderName): CodexError | null {
   return null;
 }
 
+// ── Universal call timeout backstop ───────────────────────────────────────
+// EVERY AI call, for EVERY tool and EVERY provider, is bounded by a hard
+// wall-clock cap. On timeout we abort the call's signal — which the providers
+// forward to their subprocess (codex SDK signal, gemini/claude runCliBinary
+// AbortSignal, pi execFile signal) so the underlying CLI is actually killed —
+// then surface a clear, retryable error. This guarantees a spinner can never
+// hang forever (a stuck network call, a CLI's internal rate-limit backoff,
+// codex/pi which have no timeout of their own, etc.). Normal calls finish in
+// seconds; this is only a safety net.
+const HARD_CALL_TIMEOUT_MS = 300_000; // 5 min
+
+function linkAbort(caller?: AbortSignal) {
+  const controller = new AbortController();
+  let timedOut = false;
+  const onCallerAbort = () => controller.abort();
+  if (caller) {
+    if (caller.aborted) controller.abort();
+    else caller.addEventListener("abort", onCallerAbort, { once: true });
+  }
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, HARD_CALL_TIMEOUT_MS);
+  return {
+    signal: controller.signal,
+    timedOut: () => timedOut,
+    clear: () => {
+      clearTimeout(timer);
+      if (caller) caller.removeEventListener("abort", onCallerAbort);
+    },
+  };
+}
+
 // ── Public API ──────────────────────────────────────────────────────────
 
 /**
@@ -165,17 +214,27 @@ export async function runJson<T>(
   const preflight = preflightHealth(providerName);
   if (preflight) throw preflight;
 
+  const link = linkAbort(opts.signal);
   try {
     const provider = providers[providerName] ?? providers.codex;
-    const result = await provider.runJson<T>(prompt, outputSchema, opts);
+    const result = await provider.runJson<T>(prompt, outputSchema, {
+      ...opts,
+      signal: link.signal,
+    });
     markOk(providerName);
+    recordUsage(providerName, normalizeUsage(providerName, result.usage));
     return result;
   } catch (err) {
+    if (link.timedOut()) {
+      throw new CodexError("generic", "The AI request timed out — please try again.");
+    }
     const classified = classifyCodexError(err);
     if (classified.kind !== "generic") {
       markError(providerName, classified);
     }
     throw classified;
+  } finally {
+    link.clear();
   }
 }
 
@@ -199,16 +258,26 @@ export async function runJsonInThread<T>(args: {
   const preflight = preflightHealth(providerName);
   if (preflight) throw preflight;
 
+  const link = linkAbort(args.opts?.signal);
   try {
     const provider = providers[providerName] ?? providers.codex;
-    const result = await provider.runJsonInThread<T>(args);
+    const result = await provider.runJsonInThread<T>({
+      ...args,
+      opts: { ...(args.opts ?? {}), signal: link.signal },
+    });
     markOk(providerName);
+    recordUsage(providerName, normalizeUsage(providerName, result.usage));
     return result;
   } catch (err) {
+    if (link.timedOut()) {
+      throw new CodexError("generic", "The AI request timed out — please try again.");
+    }
     const classified = classifyCodexError(err);
     if (classified.kind !== "generic") {
       markError(providerName, classified);
     }
     throw classified;
+  } finally {
+    link.clear();
   }
 }

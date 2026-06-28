@@ -135,21 +135,21 @@ export function classifyCodexError(err: unknown): CodexError {
  * The client renders this inline next to a manual Retry button; the top-bar
  * health banner carries the same account-level reason in parallel.
  */
-export function toCodexErrorPayload(err: unknown): {
+export function toCodexErrorPayload(
+  err: unknown,
+  providerLabel = "the AI engine",
+): {
   kind: CodexErrorKind;
   message: string;
 } {
   const e = err instanceof CodexError ? err : classifyCodexError(err);
   const friendly: Record<CodexErrorKind, string> = {
-    rate_limit:
-      "Codex usage limit reached — see the notice at the top. Try again once it clears.",
-    auth_lost:
-      "Codex isn't signed in. Reconnect from the notice at the top, then try again.",
-    binary_missing:
-      "The Codex engine isn't available. Open the setup wizard, then try again.",
+    rate_limit: `${providerLabel} usage limit reached — see the notice at the top. Try again once it clears.`,
+    auth_lost: `${providerLabel} isn't signed in. Reconnect from the notice at the top, then try again.`,
+    binary_missing: `${providerLabel} isn't available. Open the setup wizard, then try again.`,
     model_unsupported:
       "This version of Get It uses a model that's no longer available. Download the latest Get It to fix this.",
-    generic: "Something went wrong talking to Codex. Please try again.",
+    generic: `Something went wrong talking to ${providerLabel}. Please try again.`,
   };
   return { kind: e.kind, message: friendly[e.kind] };
 }

@@ -53,7 +53,7 @@ function threadOptions(opts: RunOptions = {}): ThreadOptions {
     approvalPolicy: "never",
     skipGitRepoCheck: true,
     workingDirectory: CODEX_SCRATCH_DIR,
-    modelReasoningEffort: effortToUse as any,
+    modelReasoningEffort: effortToUse as ThreadOptions["modelReasoningEffort"],
     webSearchEnabled: opts.webSearch ?? false,
   };
 }
@@ -94,7 +94,7 @@ export class CodexProvider implements AIProvider {
       } catch (err) {
         lastErr = err;
         const classified = classifyCodexError(err);
-        if (classified.kind === "rate_limit" || classified.kind === "auth_lost" || classified.kind === "binary_missing" || classified.kind === "model_unsupported" || (err as any).name === "AbortError") {
+        if (classified.kind === "rate_limit" || classified.kind === "auth_lost" || classified.kind === "binary_missing" || classified.kind === "model_unsupported" || (err as { name?: string }).name === "AbortError") {
           throw err;
         }
       }
@@ -143,7 +143,7 @@ export class CodexProvider implements AIProvider {
       } catch (err) {
         lastErr = err;
         const classified = classifyCodexError(err);
-        if (classified.kind === "rate_limit" || classified.kind === "auth_lost" || classified.kind === "binary_missing" || classified.kind === "model_unsupported" || (err as any).name === "AbortError") {
+        if (classified.kind === "rate_limit" || classified.kind === "auth_lost" || classified.kind === "binary_missing" || classified.kind === "model_unsupported" || (err as { name?: string }).name === "AbortError") {
           throw err;
         }
       }

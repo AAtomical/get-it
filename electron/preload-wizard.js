@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld("wizard", {
   status: () => ipcRenderer.invoke("wizard:status"),
   install: () => ipcRenderer.invoke("wizard:install"),
   login: (provider) => ipcRenderer.invoke("wizard:login", provider),
+  submitCode: (code) => ipcRenderer.invoke("wizard:submit-code", code),
+  verify: (payload) => ipcRenderer.invoke("wizard:verify", payload),
   openUrl: (url) => ipcRenderer.invoke("wizard:open-url", url),
   finish: (payload) => ipcRenderer.invoke("wizard:finish", payload),
   cancel: () => ipcRenderer.invoke("wizard:cancel"),

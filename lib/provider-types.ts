@@ -22,7 +22,7 @@ export const PROVIDER_BINARIES: Record<ProviderName, string> = {
   codex: "codex",
   gemini: "gemini",
   claude: "claude",
-  pi: "pi-coder",
+  pi: "pi",
 };
 
 /** npm package names for auto-install. */
@@ -30,7 +30,22 @@ export const PROVIDER_PACKAGES: Record<ProviderName, string> = {
   codex: "@openai/codex",
   gemini: "@google/gemini-cli",
   claude: "@anthropic-ai/claude-code",
-  pi: "pi-coder",
+  pi: "@earendil-works/pi-coding-agent",
+};
+
+/**
+ * Primary auth model per provider, which drives the account UI:
+ *   "account" → subscription/OAuth login; show plan + limits (Codex) or plan
+ *               (Claude). May fall back to API-key mode at runtime.
+ *   "apiKey"  → a key/endpoint the user pastes; show cumulative token usage.
+ * The *effective* mode is computed at runtime from real auth data; this is the
+ * default each provider is set up under.
+ */
+export const PROVIDER_AUTH_KIND: Record<ProviderName, "account" | "apiKey"> = {
+  codex: "account",
+  claude: "account",
+  gemini: "apiKey",
+  pi: "apiKey",
 };
 
 /** Documentation URLs shown when auto-install fails. */

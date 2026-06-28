@@ -5,6 +5,8 @@
  * lib/work-context.ts and stay server-only because they use node:fs.
  */
 
+import type { ProviderName } from "./provider-types";
+
 export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
@@ -17,12 +19,16 @@ export type ChatThread = {
   createdAt: number;
   updatedAt: number;
   messages: ChatMessage[];
-  /** Native Codex thread id backing this conversation. Set on the first
+  /** Native conversation/thread id backing this chat. Set on the first
    *  assistant turn; later turns resume it and send only the new message
-   *  (the document + prior turns stay in the Codex thread). Absent on
+   *  (the document + prior turns stay in the engine's thread). Absent on
    *  pre-existing chats and after a session is lost — both fall back to a
    *  fresh full-context turn. */
   codexThreadId?: string;
+  /** Which engine minted `codexThreadId`. A thread id is provider-specific,
+   *  so we only resume it when the active provider matches; otherwise we
+   *  transparently migrate by starting a fresh thread with the full history. */
+  threadProvider?: ProviderName;
 };
 
 export type Flashcard = {

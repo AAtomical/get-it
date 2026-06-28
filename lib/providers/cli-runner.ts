@@ -87,12 +87,15 @@ export function getTargetTriple(): string | null {
   return null;
 }
 
-export function resolveBundledBinary(provider: "claude" | "gemini"): string | null {
+export function resolveBundledBinary(provider: "claude" | "gemini" | "pi"): string | null {
   if (provider === "claude" && process.env.CLAUDE_BINARY_PATH && fs.existsSync(process.env.CLAUDE_BINARY_PATH)) {
     return process.env.CLAUDE_BINARY_PATH;
   }
   if (provider === "gemini" && process.env.GEMINI_BINARY_PATH && fs.existsSync(process.env.GEMINI_BINARY_PATH)) {
     return process.env.GEMINI_BINARY_PATH;
+  }
+  if (provider === "pi" && process.env.PI_BINARY_PATH && fs.existsSync(process.env.PI_BINARY_PATH)) {
+    return process.env.PI_BINARY_PATH;
   }
 
   const triple = getTargetTriple();
@@ -101,6 +104,11 @@ export function resolveBundledBinary(provider: "claude" | "gemini"): string | nu
   const getSubPath = () => {
     if (provider === "claude") {
       return triple ? ["claude-bin", triple, "claude", isWin ? "claude.exe" : "claude"] : null;
+    }
+    // Pi and Gemini are pure-JS CLIs staged whole; one copy serves every
+    // platform. They're launched through process.execPath (Electron's node).
+    if (provider === "pi") {
+      return ["pi-bin", "pi-cli", "dist", "cli.js"];
     }
     return ["gemini-bin", "gemini-cli", "bundle", "gemini.js"];
   };
@@ -170,8 +178,10 @@ export async function runCliBinary(
         ELECTRON_RUN_AS_NODE: binPath.endsWith(".js") ? "1" : process.env.ELECTRON_RUN_AS_NODE,
         ...(opts?.env || {}),
       },
-      // @ts-ignore: 'detached' is missing in some version of node types for ExecFileOptions
-      detached: process.platform !== "win32",
+      // NOT detached: the child must stay in the server's process group so the
+      // Electron main's group tree-kill (and the watchdog) reap it on shutdown.
+      // Detaching it would make it its own group leader and orphan in-flight
+      // calls when the app quits. Codex/Pi children are likewise non-detached.
     };
 
     const p = execFileAsync(finalBinPath, finalArgs, execOptions);
@@ -189,10 +199,11 @@ export async function runCliBinary(
         if (p.child && typeof p.child.pid === "number") {
           try {
             if (process.platform === "win32") {
-              const { spawnSync } = require("child_process");
               spawnSync("taskkill", ["/pid", String(p.child.pid), "/f", "/t"], { stdio: "ignore", windowsHide: true });
             } else {
-              process.kill(-p.child.pid, "SIGKILL");
+              // The child is non-detached (shares the server group), so kill it
+              // directly — a negative-pid group kill here would hit the server.
+              p.child.kill("SIGKILL");
             }
           } catch {}
         }

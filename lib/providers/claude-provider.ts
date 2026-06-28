@@ -2,7 +2,7 @@
  * Claude Code provider — invokes `claude` as a subprocess.
  *
  * CLI invocation:
- *   claude -p "<prompt>" --output-format json --bare
+ *   claude -p "<prompt>" --output-format json --json-schema <schema>
  *
  * JSON output shape:
  *   { type, subtype, result, total_cost_usd, session_id, duration_ms, num_turns, is_error }
@@ -10,8 +10,11 @@
  * Thread support:
  *   Uses native --resume <session-id> with session_id from previous output.
  *
- * --bare mode ensures hermetic execution (no local CLAUDE.md, hooks, or MCP servers).
  * --json-schema constrains the `result` field to match the output schema.
+ * We intentionally do NOT pass --bare: that "minimal mode" skips the plugin/
+ * settings load that subscription (OAuth) logins rely on, so it breaks auth
+ * for those users ("Not logged in"). Hermeticity instead comes from running
+ * in an empty scratch cwd, which has no project-level CLAUDE.md.
  */
 
 import { CODEX_SCRATCH_DIR } from "../paths";
@@ -24,17 +27,59 @@ import type {
 import { whichBinary, runCliBinary, parseJsonResponse, resolveBundledBinary } from "./cli-runner";
 import { loadSettings } from "../settings-store";
 
+// Heavy generations (a full viz spec, especially with high thinking effort on
+// opus) routinely run past the 120s cli-runner default — which SIGTERMs the
+// process and surfaces as "exited with code 143". Match Gemini's generous cap.
+const CLAUDE_TIMEOUT_MS = 600_000;
+
 type ClaudeJsonOutput = {
   type: string;
   subtype: string;
   result: string;
+  /** With --json-schema the constrained object is returned here (already
+   *  parsed); `result` is left empty in that case. */
+  structured_output?: unknown;
   total_cost_usd?: number;
   session_id?: string;
   duration_ms?: number;
   duration_api_ms?: number;
   num_turns?: number;
   is_error?: boolean;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_read_input_tokens?: number;
+    cache_creation_input_tokens?: number;
+  };
 };
+
+/** Token + cost usage for the usage store (claude reports both per call). */
+function claudeUsage(raw: ClaudeJsonOutput) {
+  const u = raw.usage ?? {};
+  return {
+    total_cost_usd: raw.total_cost_usd,
+    input_tokens:
+      (u.input_tokens ?? 0) +
+      (u.cache_read_input_tokens ?? 0) +
+      (u.cache_creation_input_tokens ?? 0),
+    output_tokens: u.output_tokens ?? 0,
+    duration_ms: raw.duration_ms,
+    num_turns: raw.num_turns,
+  };
+}
+
+/**
+ * Pull the schema-constrained payload out of a Claude CLI envelope. When
+ * `--json-schema` is used the CLI returns the object in `structured_output`
+ * and leaves `result` empty; for non-schema calls (or older CLI versions)
+ * the JSON lives as text in `result`. Handle both.
+ */
+function extractClaudeData<T>(raw: ClaudeJsonOutput): T {
+  if (raw.structured_output != null && typeof raw.structured_output === "object") {
+    return raw.structured_output as T;
+  }
+  return parseJsonResponse<T>(raw.result);
+}
 
 let _binaryPath: string | null | undefined;
 
@@ -67,19 +112,23 @@ export class ClaudeProvider implements AIProvider {
 
     const settings = loadSettings();
     const reasoning = opts.reasoning ?? "low";
-    const model = reasoning === "low" 
-      ? (settings.claudeModelFast || "claude-3-5-haiku-20241022") 
-      : (settings.claudeModelSmart || "claude-3-7-sonnet-20250219");
+    const model = reasoning === "low"
+      ? (settings.claudeModelFast || "sonnet")
+      : (settings.claudeModelSmart || "opus");
 
+    // The prompt goes over STDIN, not as a `-p <arg>`: a full-document prompt
+    // (flashcards/quiz/chat/feynman) easily exceeds the OS command-line limit
+    // (E2BIG → instant spawn failure), especially on Linux/Windows.
     const args = [
       "-p",
-      prompt,
       "--model",
       model,
-      ...(settings.claudeEffort ? ["--effort", settings.claudeEffort] : []),
+      "--effort",
+      reasoning === "low"
+        ? (settings.claudeEffortFast || settings.claudeEffort || "medium")
+        : (settings.claudeEffortSmart || settings.claudeEffort || "high"),
       "--output-format",
       "json",
-      "--bare",
       "--json-schema",
       JSON.stringify(outputSchema),
     ];
@@ -87,6 +136,8 @@ export class ClaudeProvider implements AIProvider {
     const result = await runCliBinary(bin, args, {
       signal: opts.signal,
       cwd: CODEX_SCRATCH_DIR,
+      timeoutMs: CLAUDE_TIMEOUT_MS,
+      stdin: prompt,
     });
 
     if (result.exitCode !== 0) {
@@ -101,16 +152,11 @@ export class ClaudeProvider implements AIProvider {
       throw new Error(raw.result || "Claude CLI returned an error");
     }
 
-    // The `result` field contains the schema-constrained output
-    const innerData = parseJsonResponse<T>(raw.result);
+    const innerData = extractClaudeData<T>(raw);
 
     return {
       data: innerData,
-      usage: {
-        total_cost_usd: raw.total_cost_usd,
-        duration_ms: raw.duration_ms,
-        num_turns: raw.num_turns,
-      },
+      usage: claudeUsage(raw),
     };
   }
 
@@ -127,21 +173,23 @@ export class ClaudeProvider implements AIProvider {
       const settings = loadSettings();
       const reasoning = opts.reasoning ?? "low";
       const model = reasoning === "low" 
-        ? (settings.claudeModelFast || "claude-3-5-haiku-20241022") 
-        : (settings.claudeModelSmart || "claude-3-7-sonnet-20250219");
+        ? (settings.claudeModelFast || "sonnet")
+        : (settings.claudeModelSmart || "opus");
 
-      // Use --resume <session-id> for thread continuation
+      // Use --resume <session-id> for thread continuation; the turn input goes
+      // over STDIN (never as a `-p <arg>`) to avoid the command-line size limit.
       const cliArgs = [
         "--resume",
         args.resume.threadId,
         "-p",
-        args.resume.input,
         "--model",
         model,
-        ...(settings.claudeEffort ? ["--effort", settings.claudeEffort] : []),
+        "--effort",
+      reasoning === "low"
+        ? (settings.claudeEffortFast || settings.claudeEffort || "medium")
+        : (settings.claudeEffortSmart || settings.claudeEffort || "high"),
         "--output-format",
         "json",
-        "--bare",
         "--json-schema",
         JSON.stringify(args.outputSchema),
       ];
@@ -149,6 +197,8 @@ export class ClaudeProvider implements AIProvider {
       const result = await runCliBinary(bin, cliArgs, {
         signal: opts.signal,
         cwd: CODEX_SCRATCH_DIR,
+        timeoutMs: CLAUDE_TIMEOUT_MS,
+        stdin: args.resume.input,
       });
 
       if (result.exitCode !== 0) {
@@ -164,15 +214,11 @@ export class ClaudeProvider implements AIProvider {
         throw new Error(raw.result || "Claude CLI returned an error");
       }
 
-      const innerData = parseJsonResponse<T>(raw.result);
+      const innerData = extractClaudeData<T>(raw);
 
       return {
         data: innerData,
-        usage: {
-          total_cost_usd: raw.total_cost_usd,
-          duration_ms: raw.duration_ms,
-          num_turns: raw.num_turns,
-        },
+        usage: claudeUsage(raw),
         threadId: raw.session_id ?? args.resume.threadId,
       };
     }
@@ -182,19 +228,20 @@ export class ClaudeProvider implements AIProvider {
 
     const settings = loadSettings();
     const reasoning = opts.reasoning ?? "low";
-    const model = reasoning === "low" 
-      ? (settings.claudeModelFast || "claude-3-5-haiku-20241022") 
-      : (settings.claudeModelSmart || "claude-3-7-sonnet-20250219");
+    const model = reasoning === "low"
+      ? (settings.claudeModelFast || "sonnet")
+      : (settings.claudeModelSmart || "opus");
 
     const cliArgs = [
       "-p",
-      args.start.input,
       "--model",
       model,
-      ...(settings.claudeEffort ? ["--effort", settings.claudeEffort] : []),
+      "--effort",
+      reasoning === "low"
+        ? (settings.claudeEffortFast || settings.claudeEffort || "medium")
+        : (settings.claudeEffortSmart || settings.claudeEffort || "high"),
       "--output-format",
       "json",
-      "--bare",
       "--json-schema",
       JSON.stringify(args.outputSchema),
     ];
@@ -202,6 +249,8 @@ export class ClaudeProvider implements AIProvider {
     const result = await runCliBinary(bin, cliArgs, {
       signal: opts.signal,
       cwd: CODEX_SCRATCH_DIR,
+      timeoutMs: CLAUDE_TIMEOUT_MS,
+      stdin: args.start.input,
     });
 
     if (result.exitCode !== 0) {
@@ -217,15 +266,11 @@ export class ClaudeProvider implements AIProvider {
       throw new Error(raw.result || "Claude CLI returned an error");
     }
 
-    const innerData = parseJsonResponse<T>(raw.result);
+    const innerData = extractClaudeData<T>(raw);
 
     return {
       data: innerData,
-      usage: {
-        total_cost_usd: raw.total_cost_usd,
-        duration_ms: raw.duration_ms,
-        num_turns: raw.num_turns,
-      },
+      usage: claudeUsage(raw),
       threadId: raw.session_id ?? null,
     };
   }

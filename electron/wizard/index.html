@@ -262,6 +262,34 @@
               spellcheck="false"
               style="width: 100%; padding: 8px 10px; box-sizing: border-box;"
             />
+            <p id="key-help" class="muted" hidden style="margin-top: 6px;">
+              No key yet? <a id="key-link" href="#" target="_blank" rel="noreferrer">Get a free API key</a>.
+            </p>
+          </div>
+          <div id="byok-box" hidden style="margin-top: 8px; display: none; flex-direction: column; gap: 6px;">
+            <select id="byok-preset" style="width: 100%; padding: 8px 10px; box-sizing: border-box;">
+              <option value="ollama">Ollama (local, no key)</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="custom">Custom endpoint</option>
+            </select>
+            <input id="byok-url" type="text" placeholder="API base URL" autocomplete="off" spellcheck="false" style="width: 100%; padding: 8px 10px; box-sizing: border-box;" />
+            <input id="byok-key" type="password" placeholder="API key" autocomplete="off" spellcheck="false" style="width: 100%; padding: 8px 10px; box-sizing: border-box;" />
+            <input id="byok-model" type="text" placeholder="Model id (e.g. llama3.2)" autocomplete="off" spellcheck="false" style="width: 100%; padding: 8px 10px; box-sizing: border-box;" />
+          </div>
+          <div id="code-box" hidden style="margin-top: 8px;">
+            <input
+              type="text"
+              id="code-input"
+              placeholder="Paste the code from your browser (if asked)"
+              autocomplete="off"
+              spellcheck="false"
+              style="width: 100%; padding: 8px 10px; box-sizing: border-box;"
+            />
+            <div style="margin-top: 6px;">
+              <button class="btn secondary" id="btn-submit-code" style="padding: 4px 10px; font-size: 11px;">Submit code</button>
+            </div>
           </div>
           <div id="auth-url-box" class="url-fallback" hidden>
             <strong>Browser didn't open?</strong> Visit:<br />

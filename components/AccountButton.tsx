@@ -1,11 +1,14 @@
 "use client";
 
 /**
- * Top-bar Account button + popover.
+ * Top-bar Account button + popover. One coherent panel for every provider:
  *
- * Provider-aware: shows a full Codex panel (JWT identity, rate-limit bars)
- * when using Codex CLI, or a stub panel (provider name, auth status, version,
- * help links) for Gemini CLI / Claude Code.
+ *   • Identity (email / plan) when connected, or a "Connect" prompt.
+ *   • Usage — subscription LIMITS for account logins that expose them (Codex
+ *     ChatGPT), or cumulative TOKENS USED for API-key / BYOK providers
+ *     (Gemini, Pi, and Codex/Claude on an API key) where no limit is readable.
+ *   • Provider-agnostic Sign out + Switch provider, both routed through the
+ *     single setup wizard.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -15,13 +18,29 @@ import {
   LogOut,
   RefreshCw,
   User as UserIcon,
-  CheckCircle2,
   XCircle,
   ExternalLink,
   Settings2,
+  Gauge,
 } from "lucide-react";
 
 import type { ProviderName } from "@/lib/provider-types";
+
+type ProviderUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  costUsd: number;
+  calls: number;
+  since: number | null;
+  updatedAt: number | null;
+};
+
+type RateWindow = {
+  usedPercent: number;
+  windowDurationMins: number;
+  resetsAt: number | null;
+} | null;
 
 type ProviderStatus = {
   provider: ProviderName;
@@ -30,33 +49,21 @@ type ProviderStatus = {
   installed: boolean;
   authenticated: boolean;
   version: string | null;
+  authMode: "account" | "apiKey" | null;
   account: {
     email: string | null;
     name: string | null;
     planType: string | null;
-    organizations: Array<{ id: string; title: string; role: string }>;
-    subscriptionActiveUntil: string | null;
-    authMode: string | null;
   } | null;
   rateLimits: {
-    planType: string | null;
-    primary: {
-      usedPercent: number;
-      windowDurationMins: number;
-      resetsAt: number | null;
-    } | null;
-    secondary: {
-      usedPercent: number;
-      windowDurationMins: number;
-      resetsAt: number | null;
-    } | null;
+    primary: RateWindow;
+    secondary: RateWindow;
     credits: { hasCredits: boolean; unlimited: boolean; balance: string } | null;
-    rateLimitReachedType: string | null;
   } | null;
+  usage: ProviderUsage | null;
 };
 
-// `window.getit` is declared globally in components/CodexHealthBanner.tsx;
-// this component only consumes it.
+// `window.getit` is declared globally in components/CodexHealthBanner.tsx.
 
 export default function AccountButton() {
   const [open, setOpen] = useState(false);
@@ -105,7 +112,7 @@ export default function AccountButton() {
             transition={{ duration: 0.12 }}
             className="absolute right-0 top-full z-30 mt-1.5 w-[22rem] overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-white shadow-[0_8px_24px_rgba(17,17,19,0.08)]"
           >
-            <AccountPanel refreshKey={open ? "open" : "closed"} />
+            <AccountPanel open={open} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -113,14 +120,20 @@ export default function AccountButton() {
   );
 }
 
-function AccountPanel({ refreshKey }: { refreshKey: string }) {
+function openSetup() {
+  if (typeof window !== "undefined" && window.getit?.runCodexSetup) {
+    window.getit.runCodexSetup().catch(() => {});
+  }
+}
+
+function AccountPanel({ open }: { open: boolean }) {
   const [data, setData] = useState<ProviderStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loggingOut, setLoggingOut] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    if (refreshKey !== "open") return;
+    if (!open) return;
     let cancelled = false;
     setLoading(true);
     setErr(null);
@@ -144,34 +157,28 @@ function AccountPanel({ refreshKey }: { refreshKey: string }) {
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [open]);
 
-  const handleLogout = useCallback(async () => {
-    if (loggingOut) return;
-    if (
-      !confirm(
-        "Sign out? Your library and study data stay on this device.",
-      )
-    ) {
-      return;
-    }
-    setLoggingOut(true);
+  const handleSignOut = useCallback(async () => {
+    if (busy || !data) return;
+    const msg =
+      data.authMode === "apiKey"
+        ? "Disconnect and clear the saved key for this provider? Your library and study data stay on this device."
+        : "Sign out? Your library and study data stay on this device.";
+    if (!confirm(msg)) return;
+    setBusy(true);
     try {
-      await fetch("/api/codex/logout", { method: "POST" });
+      await fetch("/api/provider/logout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ provider: data.provider }),
+      });
     } catch {
       /* ignore */
     }
-    if (typeof window !== "undefined" && window.getit?.runCodexSetup) {
-      try {
-        await window.getit.runCodexSetup();
-      } catch {
-        /* ignore */
-      }
-    }
-    setLoggingOut(false);
-  }, [loggingOut]);
-
-  const isCodex = data?.provider === "codex";
+    setBusy(false);
+    openSetup();
+  }, [busy, data]);
 
   return (
     <div className="px-3 py-2.5">
@@ -179,20 +186,18 @@ function AccountPanel({ refreshKey }: { refreshKey: string }) {
         <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ink-500)]">
           {data?.label ?? "AI Provider"} account
         </p>
-        <button
-          type="button"
-          onClick={handleLogout}
-          disabled={loggingOut || !data || data.provider !== "codex"}
-          title={!data || data.provider === "codex" ? "Sign out of Codex and return to the setup wizard" : "Change settings in the Settings menu"}
-          className={`inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-0.5 text-[10.5px] font-medium text-[var(--ink-700)] transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50 ${!data || data.provider !== "codex" ? "invisible" : ""}`}
-        >
-          {loggingOut ? (
-            <RefreshCw className="h-2.5 w-2.5 animate-spin" />
-          ) : (
-            <LogOut className="h-2.5 w-2.5" />
-          )}
-          {loggingOut ? "signing out…" : "Sign out"}
-        </button>
+        {data?.authenticated && (
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={busy}
+            title={data.authMode === "apiKey" ? "Disconnect / clear key" : "Sign out and return to setup"}
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-0.5 text-[10.5px] font-medium text-[var(--ink-700)] transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
+          >
+            {busy ? <RefreshCw className="h-2.5 w-2.5 animate-spin" /> : <LogOut className="h-2.5 w-2.5" />}
+            {busy ? "…" : data.authMode === "apiKey" ? "Disconnect" : "Sign out"}
+          </button>
+        )}
       </div>
 
       {loading && (
@@ -206,23 +211,23 @@ function AccountPanel({ refreshKey }: { refreshKey: string }) {
         <p className="mt-1.5 text-[11px] text-[var(--ink-400)]">No data.</p>
       )}
 
-      {/* ── Standardized Account Panel ── */}
       {!loading && data && (
         <>
-          {data.account ? (
+          {/* Identity */}
+          {data.authenticated && data.account ? (
             <div className="mt-1.5 flex items-center gap-2">
               <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-sunken)] text-[var(--ink-500)]">
                 <UserIcon className="h-3 w-3" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[12.5px] font-medium text-[var(--ink-900)]">
-                  {data.account.name ?? data.account.email ?? "Signed in"}
+                  {data.account.name ?? data.account.email ?? "Connected"}
                 </p>
                 <p className="truncate text-[10.5px] text-[var(--ink-500)]">
-                  {data.account.email ?? ""}
+                  {data.account.email && data.account.email !== data.account.name ? data.account.email : ""}
                   {data.account.planType ? (
                     <>
-                      {data.account.email ? " · " : ""}
+                      {data.account.email && data.account.email !== data.account.name ? " · " : ""}
                       <span className="font-medium uppercase text-[var(--accent-700)]">
                         {data.account.planType}
                       </span>
@@ -237,28 +242,30 @@ function AccountPanel({ refreshKey }: { refreshKey: string }) {
                 <XCircle className="h-3.5 w-3.5 text-rose-500" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[12.5px] font-medium text-[var(--ink-900)]">
-                  {data.label}
-                </p>
+                <p className="text-[12.5px] font-medium text-[var(--ink-900)]">{data.label}</p>
                 <p className="text-[10.5px] text-[var(--ink-500)]">
-                  Not authenticated
+                  {data.authMode === "apiKey" ? "No API key set" : "Not signed in"}
                   {data.version ? ` · v${data.version}` : ""}
                 </p>
               </div>
             </div>
           )}
 
-          {data.rateLimits ? (
+          {/* Usage: limits (account) or tokens (api-key) */}
+          {data.rateLimits && (data.rateLimits.primary || data.rateLimits.secondary) ? (
             <div className="mt-4 space-y-1.5">
               <LimitRow label="5h limit" win={data.rateLimits.primary} />
               <LimitRow label="Weekly limit" win={data.rateLimits.secondary} />
             </div>
-          ) : data.account ? (
+          ) : data.authenticated && data.usage && data.usage.calls > 0 ? (
+            <UsageRow usage={data.usage} showCost={data.authMode === "apiKey"} />
+          ) : data.authenticated ? (
             <div className="mt-4 text-[10.5px] text-[var(--ink-400)]">
-              Usage limits unavailable or unlimited.
+              No usage recorded yet.
             </div>
           ) : null}
-          
+
+          {/* Actions */}
           <div className="mt-4 flex items-center gap-2">
             <a
               href={data.docsUrl}
@@ -267,19 +274,15 @@ function AccountPanel({ refreshKey }: { refreshKey: string }) {
               className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1 text-[10.5px] font-medium text-[var(--ink-700)] transition hover:border-[var(--accent-300)] hover:text-[var(--accent-700)]"
             >
               <ExternalLink className="h-2.5 w-2.5" />
-              {data.installed ? "Auth help" : "Install guide"}
+              Help
             </a>
             <button
               type="button"
-              onClick={() => {
-                if (typeof window !== "undefined" && window.getit?.runCodexSetup) {
-                  window.getit.runCodexSetup().catch(() => {});
-                }
-              }}
+              onClick={openSetup}
               className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1 text-[10.5px] font-medium text-[var(--ink-700)] transition hover:border-[var(--accent-300)] hover:text-[var(--accent-700)]"
             >
               <Settings2 className="h-2.5 w-2.5" />
-              Switch provider
+              {data.authenticated ? "Switch provider" : "Connect"}
             </button>
           </div>
         </>
@@ -288,17 +291,34 @@ function AccountPanel({ refreshKey }: { refreshKey: string }) {
   );
 }
 
-function LimitRow({
-  label,
-  win,
-}: {
-  label: string;
-  win: {
-    usedPercent: number;
-    windowDurationMins: number;
-    resetsAt: number | null;
-  } | null;
-}) {
+function fmtTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(Math.round(n));
+}
+
+function UsageRow({ usage, showCost }: { usage: ProviderUsage; showCost: boolean }) {
+  return (
+    <div className="mt-4">
+      <div className="flex items-center justify-between text-[11px]">
+        <span className="inline-flex items-center gap-1 font-medium text-[var(--ink-700)]">
+          <Gauge className="h-3 w-3 text-[var(--accent-600)]" /> Tokens used
+        </span>
+        <span className="tabular-nums text-[var(--ink-900)]">
+          {fmtTokens(usage.totalTokens)}
+          {showCost && usage.costUsd > 0 ? (
+            <span className="ml-1 font-normal text-[var(--ink-400)]">· ${usage.costUsd.toFixed(2)}</span>
+          ) : null}
+        </span>
+      </div>
+      <p className="mt-1 text-[10.5px] text-[var(--ink-400)]">
+        {fmtTokens(usage.inputTokens)} in · {fmtTokens(usage.outputTokens)} out · {usage.calls} call{usage.calls === 1 ? "" : "s"}
+      </p>
+    </div>
+  );
+}
+
+function LimitRow({ label, win }: { label: string; win: RateWindow }) {
   if (!win) {
     return (
       <div className="flex items-center justify-between text-[10.5px] text-[var(--ink-400)]">
@@ -308,12 +328,7 @@ function LimitRow({
     );
   }
   const used = Math.max(0, Math.min(100, Math.round(win.usedPercent)));
-  const tone =
-    used >= 90
-      ? "bg-rose-500"
-      : used >= 60
-        ? "bg-amber-500"
-        : "bg-[var(--accent-600)]";
+  const tone = used >= 90 ? "bg-rose-500" : used >= 60 ? "bg-amber-500" : "bg-[var(--accent-600)]";
   const resetIn = win.resetsAt ? formatResetIn(win.resetsAt * 1000) : null;
   return (
     <div>
@@ -321,11 +336,7 @@ function LimitRow({
         <span className="font-medium text-[var(--ink-700)]">{label}</span>
         <span className="tabular-nums text-[var(--ink-900)]">
           {used}% used
-          {resetIn ? (
-            <span className="ml-1 font-normal text-[var(--ink-400)]">
-              · resets in {resetIn}
-            </span>
-          ) : null}
+          {resetIn ? <span className="ml-1 font-normal text-[var(--ink-400)]">· resets in {resetIn}</span> : null}
         </span>
       </div>
       <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-[var(--surface-sunken)]">

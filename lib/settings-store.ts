@@ -31,6 +31,12 @@ export type AppSettings = {
   geminiModelSmart?: string;
   claudeModelFast?: string;
   claudeModelSmart?: string;
+  /** Separate thinking effort per tier (like Codex). Fast is kept snappy so
+   *  one-shot tools (viz/detect/flashcards) don't spend minutes "thinking";
+   *  smart can go high for quality. `claudeEffort` is the legacy single value,
+   *  read only as a migration fallback. */
+  claudeEffortFast?: string;
+  claudeEffortSmart?: string;
   claudeEffort?: string;
   piUrl?: string;
   piApiKey?: string;
@@ -66,11 +72,12 @@ function defaultsFromEnv(): AppSettings {
     codexModelSmart: "gpt-5.5",
     codexEffortFast: "low",
     codexEffortSmart: "high",
-    geminiModelFast: "gemini-flash-lite-latest",
+    geminiModelFast: "gemini-flash-latest",
     geminiModelSmart: "gemini-pro-latest",
-    claudeModelFast: "claude-3-7-sonnet-20250219",
-    claudeModelSmart: "claude-3-7-sonnet-20250219",
-    claudeEffort: "medium",
+    claudeModelFast: "sonnet",
+    claudeModelSmart: "opus",
+    claudeEffortFast: "medium",
+    claudeEffortSmart: "high",
     geminiApiKey: process.env.GEMINI_API_KEY || "",
     piUrl,
     piApiKey,
@@ -131,7 +138,16 @@ export function loadSettings(): AppSettings {
         geminiModelSmart: typeof parsed.geminiModelSmart === "string" ? parsed.geminiModelSmart : env.geminiModelSmart,
         claudeModelFast: typeof parsed.claudeModelFast === "string" ? parsed.claudeModelFast : env.claudeModelFast,
         claudeModelSmart: typeof parsed.claudeModelSmart === "string" ? parsed.claudeModelSmart : env.claudeModelSmart,
-        claudeEffort: typeof parsed.claudeEffort === "string" ? parsed.claudeEffort : env.claudeEffort,
+        // Fast stays snappy by default (ignore a legacy high value so viz no
+        // longer hangs); a legacy single `claudeEffort` migrates to smart.
+        claudeEffortFast:
+          typeof parsed.claudeEffortFast === "string" ? parsed.claudeEffortFast : env.claudeEffortFast,
+        claudeEffortSmart:
+          typeof parsed.claudeEffortSmart === "string"
+            ? parsed.claudeEffortSmart
+            : typeof parsed.claudeEffort === "string"
+              ? parsed.claudeEffort
+              : env.claudeEffortSmart,
         piUrl,
         piApiKey,
         piModelFast:
@@ -142,8 +158,8 @@ export function loadSettings(): AppSettings {
           typeof parsed.piModelSmart === "string"
             ? parsed.piModelSmart
             : env.piModelSmart,
-        piProvider: piProvider as any,
-        piApiType: piApiType as any,
+        piProvider: piProvider as AppSettings["piProvider"],
+        piApiType: piApiType as AppSettings["piApiType"],
       };
     }
   } catch {
@@ -168,7 +184,8 @@ export function saveSettings(s: AppSettings): void {
     geminiModelSmart: s.geminiModelSmart,
     claudeModelFast: s.claudeModelFast,
     claudeModelSmart: s.claudeModelSmart,
-    claudeEffort: s.claudeEffort,
+    claudeEffortFast: s.claudeEffortFast,
+    claudeEffortSmart: s.claudeEffortSmart,
     piUrl: s.piUrl,
     piApiKey: s.piApiKey,
     piModelFast: s.piModelFast,

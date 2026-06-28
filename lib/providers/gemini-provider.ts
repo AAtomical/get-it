@@ -30,6 +30,11 @@ function ensureGeminiProjectSettings(model: string): void {
     const dir = path.join(CODEX_SCRATCH_DIR, ".gemini");
     const file = path.join(dir, "settings.json");
     const desired = {
+      // Force the Gemini API-key auth path. Without this, the CLI falls back
+      // to the (now-retired) Code Assist OAuth and fails with IneligibleTier,
+      // because a user's saved ~/.gemini selectedType would otherwise win.
+      // A workspace setting overrides the user setting.
+      security: { auth: { selectedType: "gemini-api-key" } },
       modelConfigs: {
         overrides: [
           {
@@ -114,7 +119,7 @@ export class GeminiProvider implements AIProvider {
     const settings = loadSettings();
     const reasoning = opts.reasoning ?? "low";
     const model = reasoning === "low" 
-      ? (settings.geminiModelFast || "gemini-flash-lite-latest") 
+      ? (settings.geminiModelFast || "gemini-flash-latest") 
       : (settings.geminiModelSmart || "gemini-pro-latest");
     ensureGeminiProjectSettings(model);
 
@@ -166,7 +171,7 @@ export class GeminiProvider implements AIProvider {
       const settings = loadSettings();
       const reasoning = opts.reasoning ?? "low";
       const model = reasoning === "low" 
-        ? (settings.geminiModelFast || "gemini-flash-lite-latest") 
+        ? (settings.geminiModelFast || "gemini-flash-latest") 
         : (settings.geminiModelSmart || "gemini-pro-latest");
       ensureGeminiProjectSettings(model);
 
@@ -216,7 +221,7 @@ export class GeminiProvider implements AIProvider {
     const settings = loadSettings();
     const reasoning = opts.reasoning ?? "low";
     const model = reasoning === "low" 
-      ? (settings.geminiModelFast || "gemini-flash-lite-latest") 
+      ? (settings.geminiModelFast || "gemini-flash-latest") 
       : (settings.geminiModelSmart || "gemini-pro-latest");
     ensureGeminiProjectSettings(model);
 

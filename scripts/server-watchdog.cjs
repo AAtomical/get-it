@@ -51,14 +51,30 @@ let shuttingDown = false;
 function shutdown(exitCode) {
   if (shuttingDown) return;
   shuttingDown = true;
+  // Graceful first: SIGTERM the server so it can flush.
   try {
     child.kill("SIGTERM");
   } catch {
     /* ignore */
   }
   setTimeout(() => {
+    // Then reap the WHOLE subtree — the server plus any AI subprocesses it
+    // spawned (codex/claude/gemini/pi). Electron spawned this watchdog
+    // detached, so on POSIX we're the process-group leader and a negative-pid
+    // signal hits the entire group. On Windows, taskkill /t walks the tree.
     try {
-      child.kill("SIGKILL");
+      if (process.platform === "win32") {
+        spawn("taskkill", ["/pid", String(child.pid), "/f", "/t"], {
+          stdio: "ignore",
+          windowsHide: true,
+        });
+      } else {
+        try {
+          process.kill(-process.pid, "SIGKILL");
+        } catch {
+          try { child.kill("SIGKILL"); } catch { /* ignore */ }
+        }
+      }
     } catch {
       /* ignore */
     }
