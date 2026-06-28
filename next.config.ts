@@ -81,7 +81,18 @@ const nextConfig: NextConfig = {
   // platform-specific assets (pdfjs workers, codex binary in vendor/)
   // resolve from node_modules at runtime instead of being inlined by
   // webpack.
-  serverExternalPackages: ["pdfjs-dist", "@openai/codex-sdk", "@openai/codex"],
+  //
+  // pdfkit (Markdown→PDF importer) MUST be external too: it loads its
+  // standard-font metrics with `fs.readFileSync(__dirname + '/data/*.afm')`.
+  // If webpack inlines it, `__dirname` becomes the server-chunk directory and
+  // the AFM read misses the data files entirely. Keeping it external means
+  // `__dirname` stays node_modules/pdfkit/js, right next to the traced data.
+  serverExternalPackages: [
+    "pdfjs-dist",
+    "@openai/codex-sdk",
+    "@openai/codex",
+    "pdfkit",
+  ],
 };
 
 export default nextConfig;
