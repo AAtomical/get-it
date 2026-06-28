@@ -8,7 +8,7 @@
 
 [![GDG AI Hack 2026](https://img.shields.io/badge/GDG%20AI%20Hack-Milan%202026-1a1a2e?style=for-the-badge)](https://gdg.community.dev/)
 [![Website](https://img.shields.io/badge/Website-getit.noesisai.it-5b66f1?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEwIi8+PGxpbmUgeDE9IjIiIHkxPSIxMiIgeDI9IjIyIiB5Mj0iMTIiLz48cGF0aCBkPSJNMTIgMmExNS4zIDE1LjMgMCAwIDEgNCAxMCAxNS4zIDE1LjMgMCAwIDEtNCAxMCAxNS4zIDE1LjMgMCAwIDEtNC0xMCAxNS4zIDE1LjMgMCAwIDEgNC0xMHoiLz48L3N2Zz4=&logoColor=white)](https://getit.noesisai.it)
-[![Built with Codex CLI](https://img.shields.io/badge/Built%20with-Codex%20CLI-111113?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/openai/codex)
+[![Bring your own AI](https://img.shields.io/badge/Bring%20your%20own-AI-111113?style=for-the-badge)](#bring-your-own-ai)
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
 [![Electron](https://img.shields.io/badge/Electron-33-2C2C2C?logo=electron&logoColor=9FEAF9)](https://www.electronjs.org/)
@@ -39,7 +39,7 @@ Get It. is the layer that answers it.
 
 ## How it works
 
-Drop a PDF — a digital, text-based one. Get It. checks the file up front and turns away scans or image-only documents with a clear message, because it reads text, not pictures. Once a file clears that gate, three things start at once.
+Drop a PDF — a digital, text-based one — or a Markdown (`.md`) file, which Get It. renders to a clean document on the way in. Get It. checks the file up front and turns away scans or image-only documents with a clear message, because it reads text, not pictures. Once a file clears that gate, three things start at once.
 
 1. **The page tags itself.** A concept-detection agent walks every page and plants inline tag pills on the words that benefit from a picture. Each tag carries a renderer choice: 3D scene, 2D animation, formula walkthrough, plotted graph, or cited source.
 2. **The right pane fills in.** Click a tag and its visualization renders — Three.js for anatomy and molecules, Canvas for physics and chemistry animations, KaTeX-clean formulas, a plot engine for functions and distributions, authoritative quotes for legal articles and named papers. Ready tags are marked so you can tell what already exists, and a setting renders every tag automatically as you read if you prefer. When a sandbox crashes, the agent reads its own error and re-emits a fix. The student sees "repairing" instead of red text.
@@ -58,22 +58,22 @@ After every completed session the **evaluator** agent reads the journal end-to-e
 
 The four numbers are the difference between a study app and a measurement instrument.
 
-## Bring your own ChatGPT
+## Bring your own AI
 
 The AI side of Get It. has no business model layered on top.
 
-You sign in once with the ChatGPT account you already pay for (or an OpenAI API key) through the official Codex CLI. Every agent inside the app runs against your own tier. There is no Get It. server, no shared key pool, no per-message metering, no "AI credits" wallet, no second subscription, and no plan to ever ship one.
+You sign in once with an AI account or API key you already have — through that vendor's official CLI, bundled with the app — and every agent inside Get It. runs against your own tier. There is no Get It. server, no shared key pool, no per-message metering, no "AI credits" wallet, no second subscription, and no plan to ever ship one.
 
-- **You pay for AI once.** ChatGPT Plus, Pro, Team, Enterprise, or Edu covers everything Get It. does.
-- **Plus is the practical floor.** The free tier signs in but its Codex allowance is intentionally small. Plus and above give comfortable session headroom in the same flow.
+- **Pick the engine you already pay for.** Get It. ships with four, side by side: **OpenAI Codex** (your ChatGPT Plus / Pro / Team / Enterprise / Edu account, or an OpenAI key), **Anthropic Claude** (a Claude Pro / Max subscription, or an Anthropic key), **Google Gemini** (an API key), or **bring-your-own** — any OpenAI-compatible endpoint, including a fully local model through Ollama. Switch engines whenever you like from the setup wizard; the app picks the conversation back up mid-document.
+- **You pay for AI once.** Whichever account you choose covers everything Get It. does. A paid tier gives comfortable session headroom; free tiers sign in but their allowance is intentionally small. A local model through Ollama costs nothing at all.
 - **Your data stays yours.** Your documents and study journal never leave your computer: no accounts, no cloud sync, no document upload, no model traffic through our servers. The only thing the app sends is an anonymous open/update ping — a random install id, the app version, and your OS, nothing else — so we can count how many people Get It. is helping; set `GETIT_DISABLE_ANALYTICS=1` to turn even that off. The work-context journal is a single JSON file on your disk, downloadable in one click from the right-pane menu.
-- **Rate limits are OpenAI's.** When you hit one, the app shows a countdown banner, stops cleanly, and your work is saved. Nothing retries in a loop: once the window clears you pick back up with a click (re-click a concept, hit Retry on a tool).
+- **Rate limits are your provider's.** When you hit one, the app shows a countdown banner, stops cleanly, and your work is saved. Nothing retries in a loop: once the window clears you pick back up with a click (re-click a concept, hit Retry on a tool).
 
-Other AI study apps wrap a marked-up subscription around a model API the vendor holds. Get It. wraps a study workflow around the access you already have.
+Other AI study apps wrap a marked-up subscription around a model API the vendor holds. Get It. wraps a study workflow around the access you already have — whichever vendor that is.
 
 ## Install
 
-Get It. is a desktop app. Download the installer for your machine, double-click, sign in with the ChatGPT account you already use. Nothing else to buy.
+Get It. is a desktop app. Download the installer for your machine, double-click, pick your AI engine, and sign in with the account you already use (or paste an API key). Nothing else to buy.
 
 | Platform | Installer |
 |---|---|
@@ -86,7 +86,7 @@ Every release ships on the **[Releases](https://github.com/beltromatti/get-it/re
 
 ### First launch
 
-The setup wizard verifies the bundled Codex CLI, walks the OAuth sign-in, and refuses to open the main window until both gates are green. Then drop a PDF, or open one of the five bundled samples (anatomy, classical mechanics, Italian constitution, calculus, organic chemistry). Tags, chats, flashcard decks, quizzes, Feynman sessions, and the knowledge graph all stay on your computer.
+The setup wizard lets you choose your AI engine, verifies its bundled CLI, walks you through sign-in — OAuth for the account engines, an API key for the rest — and refuses to open the main window until the connection is green. Then drop a PDF or Markdown file, or open one of the five bundled samples (anatomy, classical mechanics, Italian constitution, calculus, organic chemistry). Tags, chats, flashcard decks, quizzes, Feynman sessions, and the knowledge graph all stay on your computer.
 
 ### Gatekeeper and SmartScreen
 
@@ -135,7 +135,7 @@ npm run build && npm run electron:prepare
 node scripts/build-electron.mjs --target=mac-arm64   # or mac-x64 / win-x64 / linux-x64 / --all
 ```
 
-Artefacts land in `dist-electron/`. Cross-arch builds pull the matching Codex platform package from npm on the fly, so you do not need an Intel Mac or a Windows VM to build for them.
+Artefacts land in `dist-electron/`. Cross-arch builds pull the matching per-platform engine binaries (Codex and Claude) from npm on the fly, so you do not need an Intel Mac or a Windows VM to build for them.
 
 Releases are tag-driven. Push a `vX.Y.Z` tag to `main` and `.github/workflows/release.yml` builds every target on a native runner, attaches the `.dmg` / `.exe` / `.AppImage` to a GitHub Release, and pins the version into Info.plist and NSIS metadata from the tag itself.
 
@@ -163,11 +163,11 @@ upload  ─► quality gate (model-free) ─► pdfjs-dist extracts text + glyph
                   ◄── interactions since the last pass
 ```
 
-Nine prompts behind one auth path, nine schemas behind one shared SDK wrapper. The full design rationale, the four-axis rubric, the per-doc evaluator queue, the LLM-code sandbox, and the desktop-packaging layer are in [`technical-writeup.md`](technical-writeup.md), also rendered as [PDF](technical-writeup.pdf).
+Every prompt and schema runs behind one provider router, so the same tools behave identically whether you're signed into Codex, Claude, Gemini, or your own API key. The full design rationale, the four-axis rubric, the per-doc evaluator queue, the LLM-code sandbox, the multi-provider layer, and the desktop-packaging layer are in [`technical-writeup.md`](technical-writeup.md), also rendered as [PDF](technical-writeup.pdf).
 
 ## The team
 
-Built in 24 hours at **GDG AI Hack 2026, Milan**, for the **Braynr** challenge. The hackathon submission lived at commit `277ec43`. Everything past that commit is post-hackathon polish: desktop packaging, the persistent Library, the first-launch setup wizard, the quizzes tool, the in-app auto-update flow, the server-side jobs runner, and long-document support that keeps a 100-page PDF affordable on a single ChatGPT plan. The product is the same. Only the way it gets onto a student's laptop has changed.
+Built in 24 hours at **GDG AI Hack 2026, Milan**, for the **Braynr** challenge. The hackathon submission lived at commit `277ec43`. Everything past that commit is post-hackathon polish: desktop packaging, the persistent Library, the first-launch setup wizard, the quizzes tool, the in-app auto-update flow, the server-side jobs runner, multi-engine support (Codex, Claude, Gemini, or any API key), Markdown import, a dark theme, and long-document support that keeps a 100-page PDF affordable on a single AI plan. The product is the same. Only the way it gets onto a student's laptop has changed.
 
 - **[Mattia Beltrami](https://www.linkedin.com/in/mattia-beltrami/)**, Politecnico di Milano
 - **[Matteo Impieri](https://www.linkedin.com/in/matteo-impieri-5b5874331/)**, Politecnico di Milano
@@ -176,9 +176,9 @@ Built in 24 hours at **GDG AI Hack 2026, Milan**, for the **Braynr** challenge. 
 
 ## Notice
 
-**Get It. is an independent project. It is not affiliated with, endorsed by, or sponsored by OpenAI.** The app uses the official open-source [Codex CLI](https://github.com/openai/codex) as the transport between the local app and OpenAI's models, signed in with the end user's own ChatGPT or OpenAI API account. "OpenAI", "ChatGPT", and "Codex" are trademarks of their respective owner; we use the names only to describe what Get It. interoperates with.
+**Get It. is an independent project. It is not affiliated with, endorsed by, or sponsored by OpenAI, Anthropic, or Google.** The app talks to each model only through that vendor's own official CLI — [Codex CLI](https://github.com/openai/codex), [Claude Code](https://github.com/anthropics/claude-code), the [Gemini CLI](https://github.com/google-gemini/gemini-cli), or any OpenAI-compatible endpoint you point it at — signed in with the end user's own account or API key. "OpenAI", "ChatGPT", "Codex", "Anthropic", "Claude", "Google", and "Gemini" are trademarks of their respective owners; we use the names only to describe what Get It. interoperates with.
 
-Your use of OpenAI's models through Get It. is subject to OpenAI's own [Terms of Use](https://openai.com/policies/terms-of-use), [Usage Policies](https://openai.com/policies/usage-policies), and [Privacy Policy](https://openai.com/policies/privacy-policy), and to the Codex CLI's [own license and release notes](https://github.com/openai/codex). Those documents are authoritative for what the model service permits, how data is handled on OpenAI's side, and what each subscription tier covers.
+Your use of any model through Get It. is subject to that provider's own terms, usage policies, and privacy policy, and to the license of the CLI it ships through. Those documents are authoritative for what each service permits, how data is handled on the provider's side, and what each subscription tier covers.
 
 ## License
 
