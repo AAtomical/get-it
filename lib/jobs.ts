@@ -72,7 +72,7 @@ function docTitleFromFilename(filename: string): string {
     "calculus.pdf": "Differential & Integral Calculus",
     "chemistry.pdf": "Organic Chemistry",
   };
-  return FILENAME_TO_TITLE[filename] ?? filename.replace(/\.pdf$/i, "");
+  return FILENAME_TO_TITLE[filename] ?? filename.replace(/\.(pdf|md|markdown|mdown|mkd|mdwn)$/i, "");
 }
 
 function mergeTagsFile(
