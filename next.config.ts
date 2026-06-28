@@ -35,6 +35,12 @@ const nextConfig: NextConfig = {
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
       "./node_modules/@openai/codex/bin/codex.js",
       "./node_modules/@earendil-works/pi-coding-agent/**/*",
+      // pdfkit (Markdown→PDF importer) reads its standard-font metrics from
+      // `__dirname + '/data/*.afm'` at runtime. Previously pdfkit was only
+      // used by build-time scripts, so those data files were never traced
+      // into the standalone bundle — now the upload route renders Markdown,
+      // so they must ship or rendering throws ENOENT in the packaged app.
+      "./node_modules/pdfkit/js/data/*.afm",
     ],
   },
   // Keep the tracer out of paths the Next.js server never needs at
