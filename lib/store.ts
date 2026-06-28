@@ -15,6 +15,7 @@
 
 import fs from "node:fs";
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import {
   DOCS_INDEX_PATH,
   docDir,
@@ -71,7 +72,7 @@ function readIndex(): DocMeta[] {
 }
 
 function writeIndex(docs: DocMeta[]): void {
-  const tmp = `${DOCS_INDEX_PATH}.tmp`;
+  const tmp = `${DOCS_INDEX_PATH}.${randomUUID()}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify({ v: 1, docs }, null, 2));
   fs.renameSync(tmp, DOCS_INDEX_PATH);
 }
@@ -104,8 +105,13 @@ export function saveDoc(entry: StoreEntry): void {
     uploadedAt: entry.uploadedAt,
     numPages: entry.numPages,
   };
-  fs.writeFileSync(metaPath(entry.id), JSON.stringify(meta, null, 2));
-  fs.writeFileSync(extractedPath(entry.id), JSON.stringify(entry.extracted));
+  const writeAtomic = (p: string, data: unknown) => {
+    const tmp = `${path.dirname(p)}/${randomUUID()}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(data));
+    fs.renameSync(tmp, p);
+  };
+  writeAtomic(extractedPath(entry.id), entry.extracted);
+  writeAtomic(metaPath(entry.id), meta);
   upsertIndex(meta);
   store.set(entry.id, entry);
 }

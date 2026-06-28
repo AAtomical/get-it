@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2, Send, MessageSquare, RefreshCw } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import type { ChatThread } from "@/lib/work-context-types";
 import { consumePrefill } from "./prefill";
 
@@ -202,7 +203,7 @@ export default function ChatView({ docId }: Props) {
           type="button"
           onClick={createChat}
           disabled={creating}
-          className="m-2 flex items-center justify-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-white py-1.5 text-[12px] font-medium text-[var(--ink-900)] hover:bg-[var(--surface-sunken)] disabled:opacity-60"
+          className="m-2 flex items-center justify-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] py-1.5 text-[12px] font-medium text-[var(--ink-900)] hover:bg-[var(--surface-sunken)] disabled:opacity-60"
         >
           <Plus className="h-3.5 w-3.5" /> New chat
         </button>
@@ -217,8 +218,8 @@ export default function ChatView({ docId }: Props) {
                 key={c.id}
                 className={`group flex items-center gap-1 rounded-md px-2 py-1.5 text-[12px] ${
                   activeId === c.id
-                    ? "bg-white text-[var(--ink-900)] shadow-[0_1px_0_rgba(17,17,19,0.04)]"
-                    : "text-[var(--ink-700)] hover:bg-white"
+                    ? "bg-[var(--surface-raised)] text-[var(--ink-900)] shadow-[var(--shadow-nav)]"
+                    : "text-[var(--ink-700)] hover:bg-[var(--surface-sunken)]"
                 }`}
               >
                 <button
@@ -244,7 +245,7 @@ export default function ChatView({ docId }: Props) {
       </aside>
 
       {/* Active thread */}
-      <section className="flex min-w-0 flex-1 flex-col bg-white">
+      <section className="flex min-w-0 flex-1 flex-col bg-[var(--surface-raised)]">
         {!active ? (
           <div className="flex flex-1 items-center justify-center px-8 text-center">
             <div className="max-w-sm">
@@ -290,7 +291,7 @@ export default function ChatView({ docId }: Props) {
             e.preventDefault();
             void send();
           }}
-          className="shrink-0 border-t border-[var(--border-subtle)] bg-white p-3"
+          className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3"
         >
           <div className="flex items-end gap-2">
             <textarea
@@ -310,7 +311,7 @@ export default function ChatView({ docId }: Props) {
             <button
               type="submit"
               disabled={sending || !draft.trim()}
-              className="flex h-[44px] w-[44px] items-center justify-center rounded-md bg-[var(--ink-900)] text-white hover:bg-black disabled:opacity-40"
+              className="flex h-[44px] w-[44px] items-center justify-center rounded-md bg-[var(--button-primary-bg)] text-white hover:bg-[var(--button-primary-hover)] disabled:opacity-40"
               title="Send (Enter)"
             >
               <Send className="h-4 w-4" />
@@ -335,13 +336,54 @@ function Bubble({
   return (
     <div className={`mb-3 flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-[13px] leading-relaxed ${
+        className={`max-w-[85%] rounded-lg px-3 py-2 text-[13px] leading-relaxed ${
           isUser
-            ? "bg-[var(--ink-900)] text-white"
+            ? "bg-[var(--button-primary-bg)] text-white"
             : "bg-[var(--surface-sunken)] text-[var(--ink-900)]"
-        } ${pulsing ? "animate-pulse" : ""}`}
+        } whitespace-pre-wrap ${pulsing ? "animate-pulse" : ""}`}
       >
-        {content}
+        {pulsing ? (
+          content
+        ) : (
+          <ReactMarkdown
+            disallowedElements={["img"]}
+            components={{
+              p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+              ul: ({ children }) => <ul className="mb-1 list-disc pl-4 last:mb-0">{children}</ul>,
+              ol: ({ children }) => <ol className="mb-1 list-decimal pl-4 last:mb-0">{children}</ol>,
+              li: ({ children }) => <li className="mb-0.5 last:mb-0">{children}</li>,
+              pre: ({ children }) => (
+                <pre className="mb-2 mt-1 overflow-x-auto rounded-md bg-[var(--border-subtle)] p-3 last:mb-0">
+                  {children}
+                </pre>
+              ),
+              code: ({ className, children, node, ...props }) => {
+                const text = String(children);
+                const isInline = !className && !text.includes("\n");
+                return isInline ? (
+                  <code className="rounded bg-[var(--border-subtle)] px-1 py-0.5 text-[12px]" {...props}>
+                    {children}
+                  </code>
+                ) : (
+                  <code className={`${className ?? ""} text-[12px]`} {...props}>
+                    {children}
+                  </code>
+                );
+              },
+              a: ({ children, href }) => {
+                const safe = href && /^https?:\/\//i.test(href) ? href : undefined;
+                return (
+                  <a href={safe} className="underline underline-offset-2 hover:opacity-80" target="_blank" rel="noreferrer">
+                    {children}
+                  </a>
+                );
+              },
+              strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+            }}
+          >
+            {content}
+          </ReactMarkdown>
+        )}
       </div>
     </div>
   );

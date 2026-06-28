@@ -50,7 +50,10 @@ export function loadWorkContext(docId: string): WorkContext {
 
 export function saveWorkContext(ctx: WorkContext): void {
   ensureDocDir(ctx.docId);
-  fs.writeFileSync(workCtxPath(ctx.docId), JSON.stringify(ctx, null, 2));
+  const path = workCtxPath(ctx.docId);
+  const tmp = `${path}.${randomUUID()}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(ctx, null, 2));
+  fs.renameSync(tmp, path);
 }
 
 export function newId(): string {

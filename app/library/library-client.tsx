@@ -237,7 +237,7 @@ function LibraryRowItem({
 }) {
   const title = useMemo(() => titleOf(row.filename), [row.filename]);
   return (
-    <li className="group relative flex items-center gap-4 rounded-xl border border-[var(--border-subtle)] bg-white p-4 transition hover:border-[var(--border-strong)]">
+    <li className="group relative flex items-center gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-4 transition hover:border-[var(--border-strong)]">
       <Link
         href={`/viewer/${row.id}`}
         className="flex flex-1 items-center gap-4"
@@ -311,7 +311,7 @@ function TagsBadge({
     return (
       <span
         title="Open this PDF to start tagging concepts"
-        className="hidden shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1 text-[10.5px] text-[var(--ink-500)] sm:inline-flex"
+        className="hidden shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1 text-[10.5px] text-[var(--ink-500)] sm:inline-flex"
       >
         <TagIcon className="h-3 w-3" />
         no tags yet
@@ -323,7 +323,7 @@ function TagsBadge({
     return (
       <span
         title={`Tag detection in progress — ${analyzedPages} of ${numPages} pages scanned`}
-        className="hidden shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1 text-[10.5px] text-[var(--ink-500)] sm:inline-flex"
+        className="hidden shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1 text-[10.5px] text-[var(--ink-500)] sm:inline-flex"
       >
         <Loader2 className="h-3 w-3 animate-spin text-[var(--accent-600)]" />
         {analyzedPages}/{numPages} pages
@@ -337,7 +337,7 @@ function TagsBadge({
       className={
         allReady
           ? "hidden shrink-0 items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10.5px] text-emerald-700 sm:inline-flex"
-          : "hidden shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1 text-[10.5px] text-[var(--ink-500)] sm:inline-flex"
+          : "hidden shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1 text-[10.5px] text-[var(--ink-500)] sm:inline-flex"
       }
     >
       <TagIcon className="h-3 w-3" />
@@ -357,7 +357,7 @@ function KGBadge({
     return (
       <span
         title="Knowledge graph will build on first open"
-        className="hidden shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1 text-[10.5px] text-[var(--ink-500)] sm:inline-flex"
+        className="hidden shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1 text-[10.5px] text-[var(--ink-500)] sm:inline-flex"
       >
         <Network className="h-3 w-3" />
         pending
@@ -368,7 +368,7 @@ function KGBadge({
     return (
       <span
         title="Knowledge graph is being built"
-        className="hidden shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1 text-[10.5px] text-[var(--ink-500)] sm:inline-flex"
+        className="hidden shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1 text-[10.5px] text-[var(--ink-500)] sm:inline-flex"
       >
         <Loader2 className="h-3 w-3 animate-spin text-[var(--accent-600)]" />
         building

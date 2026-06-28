@@ -187,7 +187,7 @@ export default function QuizzesView({ docId }: Props) {
   return (
     <div className="flex h-full">
       <aside className="flex w-56 shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--surface-canvas)]">
-        <div className="m-2 rounded-md border border-[var(--border-subtle)] bg-white p-2 shadow-[0_1px_0_rgba(17,17,19,0.02)]">
+        <div className="m-2 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-2">
           <div className="mb-2 flex items-center gap-1.5">
             <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-[var(--accent-100)] bg-[var(--accent-50)] text-[var(--accent-700)]">
               <ListChecks className="h-3.5 w-3.5" />
@@ -211,7 +211,7 @@ export default function QuizzesView({ docId }: Props) {
             type="button"
             onClick={generate}
             disabled={generating}
-            className="flex w-full items-center justify-center gap-1.5 rounded-md bg-[var(--ink-900)] py-1.5 text-[12px] font-medium text-white hover:bg-black disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-1.5 rounded-md bg-[var(--button-primary-bg)] py-1.5 text-[12px] font-medium text-white hover:bg-[var(--button-primary-hover)] disabled:opacity-50"
           >
             {generating ? (
               <>
@@ -270,7 +270,7 @@ export default function QuizzesView({ docId }: Props) {
         </div>
       </aside>
 
-      <section className="flex min-w-0 flex-1 flex-col bg-white">
+      <section className="flex min-w-0 flex-1 flex-col bg-[var(--surface-raised)]">
         {!active ? (
           <EmptyHint
             icon={<ListChecks className="h-7 w-7 text-[var(--ink-400)]" />}
@@ -310,8 +310,8 @@ function QuizListItem({
     <div
       className={`group mb-1 rounded-md px-2 py-1.5 text-[11.5px] transition-colors ${
         active
-          ? "bg-white text-[var(--ink-900)] shadow-[0_1px_0_rgba(17,17,19,0.04)]"
-          : "text-[var(--ink-700)] hover:bg-white"
+          ? "bg-[var(--surface-raised)] text-[var(--ink-900)] shadow-[var(--shadow-nav)]"
+          : "text-[var(--ink-700)] hover:bg-[var(--surface-sunken)]"
       }`}
     >
       <div className="flex items-center gap-1.5">
@@ -394,7 +394,7 @@ function QuizRunner({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-white px-5 py-2.5">
+      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-raised)] px-5 py-2.5">
         <div className="mb-2 flex items-center justify-between gap-3 text-[11.5px] text-[var(--ink-500)]">
           <span className="flex min-w-0 items-center gap-2">
             <ListChecks className="h-3.5 w-3.5 shrink-0 text-[var(--accent-600)]" />
@@ -415,7 +415,7 @@ function QuizRunner({
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
           <div className="flex items-center justify-between gap-3 text-[11.5px]">
-            <div className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1 font-medium text-[var(--ink-700)]">
+            <div className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1 font-medium text-[var(--ink-700)]">
               <span className="tabular-nums">Question {safeIndex + 1}</span>
               <span className="text-[var(--ink-300)]">/</span>
               <span className="tabular-nums text-[var(--ink-500)]">{total}</span>
@@ -425,7 +425,7 @@ function QuizRunner({
             )}
           </div>
 
-          <div className="rounded-lg border border-[var(--border-default)] bg-white px-5 py-4 shadow-[0_6px_18px_rgba(17,17,19,0.06)]">
+          <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-raised)] px-5 py-4 shadow-[var(--shadow-nav)]">
             <p className="whitespace-pre-wrap text-[15.5px] leading-relaxed text-[var(--ink-900)]">
               {question.stem}
             </p>
@@ -450,7 +450,7 @@ function QuizRunner({
               <button
                 type="button"
                 onClick={onNext}
-                className="inline-flex items-center gap-1.5 rounded-md bg-[var(--ink-900)] px-4 py-2 text-[12.5px] font-medium text-white hover:bg-black"
+                className="inline-flex items-center gap-1.5 rounded-md bg-[var(--button-primary-bg)] px-4 py-2 text-[12.5px] font-medium text-white hover:bg-[var(--button-primary-hover)]"
               >
                 {isLast ? "Finish quiz" : "Next question"}
               </button>
@@ -478,23 +478,23 @@ function OptionList({
         const isPicked = picked === i;
         const isCorrect = i === question.correctIndex;
         let tone =
-          "border-[var(--border-subtle)] bg-white text-[var(--ink-900)] hover:bg-[var(--surface-sunken)]";
+          "border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--ink-900)] hover:bg-[var(--surface-sunken)]";
         let labelTone =
           "border-[var(--border-subtle)] bg-[var(--surface-canvas)] text-[var(--ink-500)]";
         let trailing: ReactNode = null;
         if (revealed) {
           if (isCorrect) {
             tone =
-              "border-emerald-200 bg-emerald-50 text-emerald-900";
-            labelTone = "border-emerald-300 bg-emerald-100 text-emerald-800";
-            trailing = <CheckCircle2 className="h-4 w-4 text-emerald-600" />;
+              "border-[var(--feedback-correct-border)] bg-[var(--feedback-correct-bg)] text-[var(--feedback-correct-text)]";
+            labelTone = "border-[var(--feedback-correct-border)] bg-[var(--feedback-correct-bg)] text-[var(--feedback-correct-text)]";
+            trailing = <CheckCircle2 className="h-4 w-4 text-[var(--feedback-correct-icon)]" />;
           } else if (isPicked) {
-            tone = "border-rose-200 bg-rose-50 text-rose-900";
-            labelTone = "border-rose-300 bg-rose-100 text-rose-800";
-            trailing = <X className="h-4 w-4 text-rose-600" />;
+            tone = "border-[var(--feedback-wrong-border)] bg-[var(--feedback-wrong-bg)] text-[var(--feedback-wrong-text)]";
+            labelTone = "border-[var(--feedback-wrong-border)] bg-[var(--feedback-wrong-bg)] text-[var(--feedback-wrong-text)]";
+            trailing = <X className="h-4 w-4 text-[var(--feedback-wrong-icon)]" />;
           } else {
             tone =
-              "border-[var(--border-subtle)] bg-white text-[var(--ink-500)] opacity-70";
+              "border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--ink-500)] opacity-70";
           }
         }
         return (
@@ -522,11 +522,11 @@ function OptionList({
 
 function VerdictBadge({ correct }: { correct: boolean }) {
   return correct ? (
-    <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--feedback-correct-border)] bg-[var(--feedback-correct-bg)] px-2 py-1 text-[11px] font-medium text-[var(--feedback-correct-text)]">
       <Check className="h-3.5 w-3.5" /> Correct
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-700">
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--feedback-wrong-border)] bg-[var(--feedback-wrong-bg)] px-2 py-1 text-[11px] font-medium text-[var(--feedback-wrong-text)]">
       <AlertCircle className="h-3.5 w-3.5" /> Not quite
     </span>
   );
@@ -547,7 +547,7 @@ function ExplanationCard({
         {correct ? "Why this is right" : "The right answer was"}
       </p>
       {!correct && (
-        <p className="mb-1 whitespace-pre-wrap text-[13px] font-medium leading-relaxed text-emerald-800">
+        <p className="mb-1 whitespace-pre-wrap text-[13px] font-medium leading-relaxed text-[var(--feedback-correct-text)]">
           {correctOption}
         </p>
       )}
@@ -575,7 +575,7 @@ function QuizComplete({
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-8 py-8 text-center">
-      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700">
+      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--feedback-correct-border)] bg-[var(--feedback-correct-bg)] text-[var(--feedback-correct-icon)]">
         <CheckCircle2 className="h-5 w-5" />
       </div>
       <p className="text-[15px] font-semibold text-[var(--ink-900)]">Quiz complete</p>
@@ -584,7 +584,7 @@ function QuizComplete({
         questions. The knowledge graph is updating in the background.
       </p>
 
-      <div className="mt-5 w-full max-w-md rounded-md border border-[var(--border-subtle)] bg-white p-3">
+      <div className="mt-5 w-full max-w-md rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3">
         <div className="mb-3 flex items-center justify-between text-[11.5px] text-[var(--ink-500)]">
           <span>Per-question result</span>
           <span>
@@ -596,10 +596,10 @@ function QuizComplete({
             const answered = q.chosenIndex != null;
             const correct = answered && q.chosenIndex === q.correctIndex;
             const tone = !answered
-              ? "border-[var(--border-subtle)] bg-white text-[var(--ink-500)]"
+              ? "border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--ink-500)]"
               : correct
-                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                : "border-rose-200 bg-rose-50 text-rose-800";
+              ? "border-[var(--feedback-correct-border)] bg-[var(--feedback-correct-bg)] text-[var(--feedback-correct-text)]"
+              : "border-[var(--feedback-wrong-border)] bg-[var(--feedback-wrong-bg)] text-[var(--feedback-wrong-text)]";
             return (
               <button
                 key={i}

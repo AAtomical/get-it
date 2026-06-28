@@ -39,34 +39,34 @@ const RATING_LABELS: Record<
     meter: string;
   }
 > = {
-  1: {
-    text: "Again",
-    hint: "Missed recall",
-    tone: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100",
-    dot: "bg-rose-500",
-    meter: "bg-rose-500",
-  },
-  2: {
-    text: "Hard",
-    hint: "Needs another pass",
-    tone: "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100",
-    dot: "bg-amber-500",
-    meter: "bg-amber-500",
-  },
-  3: {
-    text: "Good",
-    hint: "Mostly recalled",
-    tone: "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
-    dot: "bg-emerald-500",
-    meter: "bg-emerald-500",
-  },
-  4: {
-    text: "Easy",
-    hint: "Instant recall",
-    tone: "border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100",
-    dot: "bg-sky-500",
-    meter: "bg-sky-500",
-  },
+   1: {
+      text: "Again",
+      hint: "Missed recall",
+      tone: "border-[var(--feedback-wrong-border)] bg-[var(--feedback-wrong-bg)] text-[var(--feedback-wrong-text)] hover:bg-[var(--feedback-wrong-bg)]",
+      dot: "bg-[var(--feedback-wrong-icon)]",
+      meter: "bg-[var(--feedback-wrong-icon)]",
+    },
+    2: {
+      text: "Hard",
+      hint: "Needs another pass",
+      tone: "border-[var(--tag-amber-ring)] bg-[var(--tag-amber-bg)] text-[var(--tag-amber-fg)] hover:bg-[var(--tag-amber-bg)]",
+      dot: "bg-[var(--tag-amber-fg)]",
+      meter: "bg-[var(--tag-amber-fg)]",
+    },
+    3: {
+      text: "Good",
+      hint: "Mostly recalled",
+      tone: "border-[var(--feedback-correct-border)] bg-[var(--feedback-correct-bg)] text-[var(--feedback-correct-text)] hover:bg-[var(--feedback-correct-bg)]",
+      dot: "bg-[var(--feedback-correct-icon)]",
+      meter: "bg-[var(--feedback-correct-icon)]",
+    },
+    4: {
+      text: "Easy",
+      hint: "Instant recall",
+      tone: "border-[var(--tag-sky-ring)] bg-[var(--tag-sky-bg)] text-[var(--tag-sky-fg)] hover:bg-[var(--tag-sky-bg)]",
+      dot: "bg-[var(--tag-sky-fg)]",
+      meter: "bg-[var(--tag-sky-fg)]",
+    },
 };
 
 export default function FlashcardsView({ docId }: Props) {
@@ -230,7 +230,7 @@ export default function FlashcardsView({ docId }: Props) {
   return (
     <div className="flex h-full">
       <aside className="flex w-56 shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--surface-canvas)]">
-        <div className="m-2 rounded-md border border-[var(--border-subtle)] bg-white p-2 shadow-[0_1px_0_rgba(17,17,19,0.02)]">
+        <div className="m-2 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-2">
           <div className="mb-2 flex items-center gap-1.5">
             <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-[var(--accent-100)] bg-[var(--accent-50)] text-[var(--accent-700)]">
               <Layers className="h-3.5 w-3.5" />
@@ -254,7 +254,7 @@ export default function FlashcardsView({ docId }: Props) {
             type="button"
             onClick={generate}
             disabled={generating}
-            className="flex w-full items-center justify-center gap-1.5 rounded-md bg-[var(--ink-900)] py-1.5 text-[12px] font-medium text-white hover:bg-black disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-1.5 rounded-md bg-[var(--button-primary-bg)] py-1.5 text-[12px] font-medium text-white hover:bg-[var(--button-primary-hover)] disabled:opacity-50"
           >
             {generating ? (
               <>
@@ -273,7 +273,7 @@ export default function FlashcardsView({ docId }: Props) {
                 type="button"
                 onClick={generate}
                 disabled={generating}
-                className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-medium text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-[var(--feedback-wrong-border)] bg-[var(--feedback-wrong-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--feedback-wrong-text)] transition hover:opacity-80 disabled:opacity-50"
               >
                 <RefreshCw className="h-3 w-3" /> Retry
               </button>
@@ -313,7 +313,7 @@ export default function FlashcardsView({ docId }: Props) {
         </div>
       </aside>
 
-      <section className="flex min-w-0 flex-1 flex-col bg-white">
+      <section className="flex min-w-0 flex-1 flex-col bg-[var(--surface-raised)]">
         {!active ? (
           <EmptyHint
             icon={<Layers className="h-7 w-7 text-[var(--ink-400)]" />}
@@ -356,8 +356,8 @@ function DeckListItem({
     <div
       className={`group mb-1 rounded-md px-2 py-1.5 text-[11.5px] transition-colors ${
         active
-          ? "bg-white text-[var(--ink-900)] shadow-[0_1px_0_rgba(17,17,19,0.04)]"
-          : "text-[var(--ink-700)] hover:bg-white"
+          ? "bg-[var(--surface-raised)] text-[var(--ink-900)] shadow-[var(--shadow-nav)]"
+          : "text-[var(--ink-700)] hover:bg-[var(--surface-sunken)]"
       }`}
     >
       <div className="flex items-center gap-1.5">
@@ -402,7 +402,7 @@ function StatusDot({ ended, progress }: { ended: boolean; progress: number }) {
   return (
     <span
       className={`h-2 w-2 shrink-0 rounded-full ${
-        complete ? "bg-emerald-500" : progress > 0 ? "bg-[var(--accent-500)]" : "bg-[var(--ink-300)]"
+        complete ? "bg-[var(--feedback-correct-icon)]" : progress > 0 ? "bg-[var(--accent-500)]" : "bg-[var(--ink-300)]"
       }`}
       title={complete ? "Deck complete" : progress > 0 ? "In progress" : "Not started"}
     />
@@ -445,7 +445,7 @@ function CardRunner({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-white px-5 py-2.5">
+      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-raised)] px-5 py-2.5">
         <div className="mb-2 flex items-center justify-between gap-3 text-[11.5px] text-[var(--ink-500)]">
           <span className="flex min-w-0 items-center gap-2">
             <Layers className="h-3.5 w-3.5 shrink-0 text-[var(--accent-600)]" />
@@ -468,7 +468,7 @@ function CardRunner({
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
           <div className="flex items-center justify-between gap-3 text-[11.5px]">
-            <div className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1 font-medium text-[var(--ink-700)]">
+            <div className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1 font-medium text-[var(--ink-700)]">
               <span className="tabular-nums">Card {safeIndex + 1}</span>
               <span className="text-[var(--ink-300)]">/</span>
               <span className="tabular-nums text-[var(--ink-500)]">{total}</span>
@@ -495,7 +495,7 @@ function CardRunner({
                 placeholder="Type your answer before revealing it..."
                 rows={3}
                 disabled={revealed}
-                className="min-h-[76px] w-full resize-none rounded-md border border-[var(--border-subtle)] bg-white px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-900)] placeholder:text-[var(--ink-400)] focus:border-[var(--accent-500)] focus:outline-none disabled:bg-[var(--surface-sunken)]"
+                className="min-h-[76px] w-full resize-none rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-3 py-2 text-[13px] leading-relaxed text-[var(--ink-900)] placeholder:text-[var(--ink-400)] focus:border-[var(--accent-500)] focus:outline-none disabled:bg-[var(--surface-sunken)]"
               />
             </div>
           )}
@@ -515,7 +515,7 @@ function CardRunner({
             <button
               type="button"
               onClick={onReveal}
-              className="self-center inline-flex items-center gap-1.5 rounded-md bg-[var(--ink-900)] px-4 py-2 text-[12.5px] font-medium text-white hover:bg-black"
+              className="self-center inline-flex items-center gap-1.5 rounded-md bg-[var(--button-primary-bg)] px-4 py-2 text-[12.5px] font-medium text-white hover:bg-[var(--button-primary-hover)]"
             >
               <Eye className="h-3.5 w-3.5" /> Reveal answer
             </button>
@@ -553,7 +553,7 @@ function FlashcardStack({
   return (
     <div className="relative px-2 pb-2 pt-1">
       <div className="absolute inset-x-8 top-4 h-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)]" />
-      <div className="absolute inset-x-5 top-2 h-full rounded-lg border border-[var(--border-subtle)] bg-white" />
+      <div className="absolute inset-x-5 top-2 h-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)]" />
       <div className="relative [perspective:1400px]">
         <div
           className={`relative h-[min(42vh,320px)] min-h-[250px] transition-transform duration-500 [transform-style:preserve-3d] ${
@@ -571,7 +571,7 @@ function FlashcardStack({
             label="Answer"
             kicker="Reveal"
             text={answer}
-            accent="border-emerald-200 bg-emerald-50 text-emerald-700"
+            accent="border-[var(--feedback-correct-border)] bg-[var(--feedback-correct-bg)] text-[var(--feedback-correct-text)]"
             className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)]"
           />
         </div>
@@ -595,7 +595,7 @@ function FlashcardFace({
 }) {
   return (
     <div
-      className={`flex h-full flex-col rounded-lg border border-[var(--border-default)] bg-white shadow-[0_12px_30px_rgba(17,17,19,0.08)] ${className ?? ""}`}
+      className={`flex h-full flex-col rounded-lg border border-[var(--border-default)] bg-[var(--surface-raised)] shadow-[var(--shadow-popover)] ${className ?? ""}`}
     >
       <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
         <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-semibold ${accent}`}>
@@ -615,7 +615,7 @@ function FlashcardFace({
 
 function RatingControls({ onRate }: { onRate: (r: Rating) => void }) {
   return (
-    <div className="rounded-md border border-[var(--border-subtle)] bg-white p-3">
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3">
       <p className="mb-2 text-center text-[11.5px] font-medium text-[var(--ink-500)]">
         How well did you recall it?
       </p>
@@ -677,7 +677,7 @@ function DeckComplete({
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-8 py-8 text-center">
-      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700">
+      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--feedback-correct-border)] bg-[var(--feedback-correct-bg)] text-[var(--feedback-correct-icon)]">
         <CheckCircle2 className="h-5 w-5" />
       </div>
       <p className="text-[15px] font-semibold text-[var(--ink-900)]">Deck complete</p>
@@ -686,7 +686,7 @@ function DeckComplete({
         The knowledge graph is updating in the background.
       </p>
 
-      <div className="mt-5 w-full max-w-md rounded-md border border-[var(--border-subtle)] bg-white p-3">
+      <div className="mt-5 w-full max-w-md rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3">
         <div className="mb-3 flex items-center justify-between text-[11.5px] text-[var(--ink-500)]">
           <span>Recall profile</span>
           <span>{stats.answered.length}/{session.cards.length}</span>
@@ -721,7 +721,7 @@ function DeckComplete({
             className={`h-7 w-7 rounded-md border text-[11px] font-medium ${
               c.rating != null
                 ? RATING_LABELS[c.rating].tone
-                : "border-[var(--border-subtle)] bg-white text-[var(--ink-500)]"
+                : "border-[var(--border-subtle)] bg-[var(--surface-raised)] text-[var(--ink-500)]"
             }`}
             title={`Card ${i + 1}`}
           >

@@ -50,7 +50,7 @@ if (typeof electronModule === "string") {
   process.exit(1);
 }
 
-const { app, BrowserWindow, dialog, shell, ipcMain } = electronModule;
+const { app, BrowserWindow, dialog, shell, ipcMain, nativeTheme } = electronModule;
 
 const { spawn, spawnSync } = require("node:child_process");
 const path = require("node:path");
@@ -306,16 +306,42 @@ function stopEmbeddedServer() {
 // ── Main window ─────────────────────────────────────────────────────────
 let mainWindow = null;
 
+// Window chrome (the native open-flash background and the Windows title-bar
+// overlay) is painted by the OS *before* the Next renderer mounts, so it has
+// to match the user's theme up front or a light-mode user gets a dark flash
+// and a permanently dark Windows caption. We read the same persisted
+// `settings.json` the app does; `undefined`/absent means "follow system",
+// which we resolve through Electron's nativeTheme.
+function prefersDarkChrome() {
+  try {
+    const raw = fs.readFileSync(path.join(DATA_DIR, "settings.json"), "utf-8");
+    const theme = JSON.parse(raw).theme;
+    if (theme === "dark") return true;
+    if (theme === "light") return false;
+  } catch {
+    /* no saved setting — fall through to the OS preference */
+  }
+  return nativeTheme.shouldUseDarkColors;
+}
+
+// Editorial "ink on warm white" palette, matched to app/globals.css so the
+// native chrome and the web UI agree in both themes.
+const CHROME = {
+  dark: { bg: "#111113", overlayBg: "#111113", overlaySymbol: "#e4e4e7" },
+  light: { bg: "#ffffff", overlayBg: "#ffffff", overlaySymbol: "#111113" },
+};
+
 function createMainWindow() {
   const isMac = process.platform === "darwin";
   const isWin = process.platform === "win32";
+  const chrome = prefersDarkChrome() ? CHROME.dark : CHROME.light;
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 820,
     minWidth: 960,
     minHeight: 600,
     title: "Get It.",
-    backgroundColor: "#ffffff",
+    backgroundColor: chrome.bg,
     show: false,
     // Modern integrated title bar: the app's top tab-bar becomes the
     // drag region, and platform-native window controls are inset into
@@ -334,7 +360,7 @@ function createMainWindow() {
     //     decoration above it.
     titleBarStyle: isMac ? "hiddenInset" : isWin ? "hidden" : "default",
     titleBarOverlay: isWin
-      ? { color: "#ffffff", symbolColor: "#111113", height: 36 }
+      ? { color: chrome.overlayBg, symbolColor: chrome.overlaySymbol, height: 36 }
       : undefined,
     trafficLightPosition: isMac ? { x: 14, y: 14 } : undefined,
     webPreferences: {

@@ -169,7 +169,7 @@ function Backdrop({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-[0_24px_64px_rgba(17,17,19,0.18)]">
+      <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-[var(--surface-raised)] shadow-[var(--shadow-modal)]">
         <button
           type="button"
           onClick={onClose}
@@ -275,7 +275,7 @@ function WelcomeCard({
         ))}
       </ul>
 
-      <div className="mx-6 my-4 rounded-xl border border-[var(--border-subtle)] bg-white px-4 py-3 text-[12px] leading-relaxed text-[var(--ink-700)]">
+      <div className="mx-6 my-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-4 py-3 text-[12px] leading-relaxed text-[var(--ink-700)]">
         <p>
           <strong>Free, forever, and yours to shape.</strong> Your documents
           and study journal never leave this computer: no accounts, no cloud

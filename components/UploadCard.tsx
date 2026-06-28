@@ -107,14 +107,16 @@ export default function UploadCard() {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     fetch("/api/sample-pdfs")
       .then((r) => r.json())
-      .then((j) => setSamples(j.samples || []))
+      .then((j) => { if (!cancelled) setSamples(j.samples || []); })
       .catch(() => {});
     fetch("/api/library", { cache: "no-store" })
       .then((r) => r.json())
-      .then((j: { docs?: LibraryRow[] }) => setLibrary(j.docs ?? []))
+      .then((j: { docs?: LibraryRow[] }) => { if (!cancelled) setLibrary(j.docs ?? []); })
       .catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   const libraryPreview = useMemo(() => library.slice(0, 6), [library]);
@@ -195,6 +197,7 @@ export default function UploadCard() {
           if (f) startUpload(f);
         }}
         onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inputRef.current?.click(); } }}
         role="button"
         tabIndex={0}
         className={[
@@ -259,19 +262,19 @@ export default function UploadCard() {
       {error && (
         <div
           role="alert"
-          className="mt-5 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3.5"
+          className="mt-5 flex items-start gap-3 rounded-xl border border-[var(--feedback-wrong-border)] bg-[var(--feedback-wrong-bg)] px-4 py-3.5"
         >
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" aria-hidden />
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--feedback-wrong-icon)]" aria-hidden />
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-semibold text-rose-900">
+            <p className="text-[13px] font-semibold text-[var(--feedback-wrong-text)]">
               We couldn&rsquo;t open this document
             </p>
-            <p className="mt-1 text-[12.5px] leading-relaxed text-rose-800">{error}</p>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--feedback-wrong-text)]">{error}</p>
           </div>
           <button
             type="button"
             onClick={() => setError(null)}
-            className="-mr-1 -mt-1 shrink-0 rounded-md p-1 text-rose-400 transition hover:bg-rose-100 hover:text-rose-700"
+            className="-mr-1 -mt-1 shrink-0 rounded-md p-1 text-[var(--feedback-wrong-icon)] transition hover:bg-[var(--feedback-wrong-bg)] hover:text-[var(--feedback-wrong-text)]"
             aria-label="Dismiss"
           >
             <X className="h-3.5 w-3.5" />
@@ -310,7 +313,7 @@ export default function UploadCard() {
                 <Link
                   key={d.id}
                   href={`/viewer/${d.id}`}
-                  className="group flex items-start gap-4 rounded-xl border border-[var(--border-subtle)] bg-white p-4 text-left transition hover:border-[var(--border-strong)]"
+                  className="group flex items-start gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-4 text-left transition hover:border-[var(--border-strong)]"
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-sunken)] text-[var(--ink-500)]">
                     <FileText className="h-5 w-5" aria-hidden />
@@ -323,7 +326,7 @@ export default function UploadCard() {
                       {d.numPages} page{d.numPages === 1 ? "" : "s"} · last opened {humaniseAgo(d.lastActivityAt)}
                     </p>
                     {d.kgStatus === "ready" && d.kgEvaluationCount > 0 && (
-                      <p className="mt-1 inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                      <p className="mt-1 inline-flex items-center gap-1 rounded-md border border-[var(--feedback-correct-border)] bg-[var(--feedback-correct-bg)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--feedback-correct-text)]">
                         <Network className="h-2.5 w-2.5" />
                         {d.kgEvaluationCount} eval{d.kgEvaluationCount === 1 ? "" : "s"}
                       </p>
@@ -354,7 +357,7 @@ export default function UploadCard() {
                 key={s.id}
                 onClick={() => startSample(s.id)}
                 disabled={busy != null}
-                className="group flex items-start gap-4 rounded-xl border border-[var(--border-subtle)] bg-white p-4 text-left transition hover:border-[var(--border-strong)] disabled:opacity-50"
+                className="group flex items-start gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-4 text-left transition hover:border-[var(--border-strong)] disabled:opacity-50"
               >
                 <div
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-sunken)]"

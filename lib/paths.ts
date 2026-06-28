@@ -29,6 +29,13 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
+const DOC_ID_RE = /^[a-z0-9-]{1,64}$/;
+function assertValidDocId(docId: string): void {
+  if (!DOC_ID_RE.test(docId)) {
+    throw new Error(`Invalid docId: ${docId}`);
+  }
+}
+
 const APP_DIR_NAME = "get-it";
 
 function defaultUserDataDir(): string {
@@ -66,33 +73,41 @@ fs.mkdirSync(DOCS_DIR, { recursive: true });
 fs.mkdirSync(CODEX_SCRATCH_DIR, { recursive: true });
 
 export function docDir(docId: string): string {
+  assertValidDocId(docId);
   return path.join(DOCS_DIR, docId);
 }
 
 export function pdfPath(docId: string): string {
+  assertValidDocId(docId);
   return path.join(docDir(docId), "source.pdf");
 }
 
 export function metaPath(docId: string): string {
+  assertValidDocId(docId);
   return path.join(docDir(docId), "meta.json");
 }
 
 export function extractedPath(docId: string): string {
+  assertValidDocId(docId);
   return path.join(docDir(docId), "extracted.json");
 }
 
 export function workCtxPath(docId: string): string {
+  assertValidDocId(docId);
   return path.join(docDir(docId), "workctx.json");
 }
 
 export function kgPath(docId: string): string {
+  assertValidDocId(docId);
   return path.join(docDir(docId), "kg.json");
 }
 
 export function tagsPath(docId: string): string {
+  assertValidDocId(docId);
   return path.join(docDir(docId), "tags.json");
 }
 
 export function ensureDocDir(docId: string): void {
+  assertValidDocId(docId);
   fs.mkdirSync(docDir(docId), { recursive: true });
 }

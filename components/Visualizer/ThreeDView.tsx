@@ -13,6 +13,7 @@ type Props = {
 
 export default function ThreeDView({ spec, onRuntimeError }: Props) {
   const mountRef = useRef<HTMLDivElement | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const [error, setError] = useState<string | null>(null);
   const reportedRef = useRef(false);
 
@@ -35,7 +36,9 @@ export default function ThreeDView({ spec, onRuntimeError }: Props) {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(width, height);
-    renderer.setClearColor("#ffffff", 1);
+    const isDark = document.documentElement.classList.contains("dark");
+    renderer.setClearColor(isDark ? "#1a1a1f" : "#ffffff", 1);
+    rendererRef.current = renderer;
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -196,6 +199,7 @@ export default function ThreeDView({ spec, onRuntimeError }: Props) {
       cancelAnimationFrame(raf);
       clearTimeout(blankCheck);
       ro.disconnect();
+      rendererRef.current = null;
       mount.removeEventListener("pointerdown", onDown);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
@@ -218,15 +222,29 @@ export default function ThreeDView({ spec, onRuntimeError }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spec]);
 
+  // Theme reactivity: watch html.dark class and update the renderer clear
+  // colour without tearing down the WebGL context.
+  useEffect(() => {
+    const el = document.documentElement;
+    const mo = new MutationObserver(() => {
+      const r = rendererRef.current;
+      if (!r) return;
+      const dark = el.classList.contains("dark");
+      r.setClearColor(dark ? "#1a1a1f" : "#ffffff", 1);
+    });
+    mo.observe(el, { attributes: true, attributeFilter: ["class"] });
+    return () => mo.disconnect();
+  }, []);
+
   return (
     <div className="relative h-full w-full">
       <div ref={mountRef} className="h-full w-full cursor-grab active:cursor-grabbing" />
       {error && (
-        <div className="absolute bottom-3 left-3 right-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <div className="absolute bottom-3 left-3 right-3 rounded-md border border-[var(--feedback-wrong-border)] bg-[var(--feedback-wrong-bg)] px-3 py-2 text-xs text-[var(--feedback-wrong-text)]">
           {error}
         </div>
       )}
-      <div className="pointer-events-none absolute right-3 top-3 rounded-md border border-[var(--border-subtle)] bg-white/85 px-2.5 py-1 text-[10px] uppercase tracking-wider text-[var(--ink-500)] backdrop-blur">
+      <div className="pointer-events-none absolute right-3 top-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)]/85 px-2.5 py-1 text-[10px] uppercase tracking-wider text-[var(--ink-500)] backdrop-blur">
         drag · scroll
       </div>
     </div>

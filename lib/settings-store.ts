@@ -14,6 +14,7 @@
  */
 
 import fs from "node:fs";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { DATA_DIR } from "./paths";
 import { AUTO_GENERATE_VIZ, MAX_VIZ_GEN_RETRIES } from "./config";
@@ -44,6 +45,8 @@ export type AppSettings = {
   piModelSmart?: string;
   piProvider?: "ollama" | "gemini" | "openai" | "anthropic" | "custom";
   piApiType?: "openai-completions" | "google-generative-ai" | "anthropic-messages";
+  /** Undefined means "follow system preference" (default). */
+  theme?: "light" | "dark";
 };
 
 const VERSION = 2 as const; // Bumped to 2 for new settings structure
@@ -95,7 +98,7 @@ export function loadSettings(): AppSettings {
     // Accept version 1 or 2
     if (parsed && (parsed.v === 1 || parsed.v === VERSION)) {
       const env = defaultsFromEnv();
-      
+
       const loadedProvider = ["codex", "gemini", "claude", "pi"].includes(parsed.provider as string)
         ? (parsed.provider as AppSettings["provider"])
         : env.provider;
@@ -119,7 +122,7 @@ export function loadSettings(): AppSettings {
         else piApiType = "openai-completions";
       }
 
-      return {
+      const s: AppSettings = {
         autoGenerate:
           typeof parsed.autoGenerate === "boolean"
             ? parsed.autoGenerate
@@ -161,6 +164,10 @@ export function loadSettings(): AppSettings {
         piProvider: piProvider as AppSettings["piProvider"],
         piApiType: piApiType as AppSettings["piApiType"],
       };
+      if (parsed.theme === "light" || parsed.theme === "dark") {
+        s.theme = parsed.theme;
+      }
+      return s;
     }
   } catch {
     /* file missing or malformed — fall through to env defaults */
@@ -169,7 +176,7 @@ export function loadSettings(): AppSettings {
 }
 
 export function saveSettings(s: AppSettings): void {
-  const file = {
+  const file: Record<string, unknown> = {
     v: VERSION,
     savedAt: Date.now(),
     autoGenerate: !!s.autoGenerate,
@@ -193,7 +200,10 @@ export function saveSettings(s: AppSettings): void {
     piProvider: s.piProvider,
     piApiType: s.piApiType,
   };
-  const tmp = `${SETTINGS_PATH}.tmp`;
+  if (s.theme === "light" || s.theme === "dark") {
+    file.theme = s.theme;
+  }
+  const tmp = `${SETTINGS_PATH}.${randomUUID()}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(file, null, 2));
   fs.renameSync(tmp, SETTINGS_PATH);
 }

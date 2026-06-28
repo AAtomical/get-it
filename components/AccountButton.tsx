@@ -110,7 +110,7 @@ export default function AccountButton() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.12 }}
-            className="absolute right-0 top-full z-30 mt-1.5 w-[22rem] overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-white shadow-[0_8px_24px_rgba(17,17,19,0.08)]"
+            className="absolute right-0 top-full z-30 mt-1.5 w-[22rem] overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] shadow-[var(--shadow-popover)]"
           >
             <AccountPanel open={open} />
           </motion.div>
@@ -192,7 +192,7 @@ function AccountPanel({ open }: { open: boolean }) {
             onClick={handleSignOut}
             disabled={busy}
             title={data.authMode === "apiKey" ? "Disconnect / clear key" : "Sign out and return to setup"}
-            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-0.5 text-[10.5px] font-medium text-[var(--ink-700)] transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-0.5 text-[10.5px] font-medium text-[var(--ink-700)] transition hover:border-[var(--feedback-wrong-border)] hover:bg-[var(--feedback-wrong-bg)] hover:text-[var(--feedback-wrong-text)] disabled:opacity-50"
           >
             {busy ? <RefreshCw className="h-2.5 w-2.5 animate-spin" /> : <LogOut className="h-2.5 w-2.5" />}
             {busy ? "…" : data.authMode === "apiKey" ? "Disconnect" : "Sign out"}

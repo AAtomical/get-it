@@ -3,11 +3,30 @@
  * visualizers. We use `new Function` rather than eval, expose only the
  * specific API the renderer needs, and forbid common escape hatches by
  * shadowing them in the function's local scope.
+ *
+ * ## Threat model
+ * The sandbox prevents the model code from:
+ *   - Accessing the global object or constructor chain (`Function`/`eval`/etc.)
+ *   - Making network requests (`fetch`/`XMLHttpRequest`/`WebSocket`/`navigator.sendBeacon`)
+ *   - Accessing the DOM (`window`/`document`/`location`)
+ *   - Reading or writing local files (`require`/`process`/`fs`)
+ *   - Using `localStorage`/`sessionStorage`
+ *
+ * It does NOT prevent exfiltration via the THREE.js or Canvas 2D APIs that
+ * are intentionally exposed (e.g. `canvas.toDataURL()` in 2D, or reading
+ * texture data in 3D). This is an acceptable risk because:
+ *   1. The user is a trusted actor (their own token on their own machine).
+ *   2. Codex SDK prompts are constrained; the model would need adversarial
+ *      intent to craft exfil code, and even then the network APIs are blocked.
+ *   3. The forerunner server (Electron main / next dev) handles file I/O and
+ *      env secrets — none of that leaks into the renderer process.
  */
 
 // "import" is a reserved word and can't be used as a parameter name; it's
-// a syntax error to call it as a function anyway. Same for `eval` in strict
-// mode of new Function bodies — but it's still a useful shadow there.
+// a syntax error to call it as a function anyway. eval, Function, async
+// and generator constructors are shadowed here, and the constructor-chain
+// escape is blocked by nulling Function/AsyncFunction/GeneratorFunction
+// prototype.constructor before the model code runs (restored in finally).
 const FORBIDDEN = [
   "window",
   "document",
@@ -16,6 +35,7 @@ const FORBIDDEN = [
   "WebSocket",
   "require",
   "Function",
+  "eval",
   "globalThis",
   "self",
   "process",
@@ -24,6 +44,14 @@ const FORBIDDEN = [
   "localStorage",
   "sessionStorage",
 ];
+
+// Captured at module load so they survive the constructor nulling that the
+// compileFn wrapper performs. NOT passed into the new Function body — the
+// model code's closure never sees them.
+const ORIG_FUNC = {}.constructor.constructor;
+const ORIG_ASYNC = Object.getPrototypeOf(async function () {}).constructor;
+const ORIG_GEN = Object.getPrototypeOf(function* () {}).constructor;
+const FORBIDDEN_UNDEFS = FORBIDDEN.map(() => undefined);
 
 export type CompiledFn = (api: Record<string, unknown>) => unknown;
 
@@ -43,6 +71,10 @@ export function compileFn(body: string): CompiledFn {
   // model expects, then we run the model code inside an INNER IIFE so that
   // any `const THREE = ...` the model emits lives in its own scope and
   // shadows the outer binding instead of colliding with it.
+  //
+  // Constructor nulling/restoring is NOT done in here — it happens in the
+  // wrapper below so the original constructor references are never in a
+  // scope the model code's closure can reach.
   const wrapped = `
     const THREE = api.THREE;
     const scene = api.scene;
@@ -59,6 +91,21 @@ export function compileFn(body: string): CompiledFn {
     })();
   `;
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
-  const fn = new Function(...args, wrapped) as CompiledFn;
-  return (api: Record<string, unknown>) => fn(api);
+  const fn = new Function(...args, wrapped) as (...args: unknown[]) => unknown;
+  return (api: Record<string, unknown>) => {
+    // Null constructors before the model code executes.  The ORIG_*
+    // references are captured at module scope and are *not* passed into
+    // `new Function` — they live only in this closure, which the model
+    // code cannot reach.
+    if (ORIG_FUNC) ORIG_FUNC.prototype.constructor = void 0;
+    if (ORIG_ASYNC) ORIG_ASYNC.prototype.constructor = void 0;
+    if (ORIG_GEN) ORIG_GEN.prototype.constructor = void 0;
+    try {
+      return fn(api, ...FORBIDDEN_UNDEFS) as ReturnType<CompiledFn>;
+    } finally {
+      if (ORIG_FUNC) ORIG_FUNC.prototype.constructor = ORIG_FUNC;
+      if (ORIG_ASYNC) ORIG_ASYNC.prototype.constructor = ORIG_ASYNC;
+      if (ORIG_GEN) ORIG_GEN.prototype.constructor = ORIG_GEN;
+    }
+  };
 }
