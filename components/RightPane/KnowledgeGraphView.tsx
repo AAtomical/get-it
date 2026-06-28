@@ -128,7 +128,7 @@ export default function KnowledgeGraphView({ docId, onJumpToTool, providerLabel 
               setBuilding(false);
             }
           }}
-          className="mt-2 rounded-md bg-[var(--ink-900)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-black"
+          className="mt-2 rounded-md bg-[var(--button-primary-bg)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--button-primary-hover)]"
         >
           Retry
         </button>

@@ -14,9 +14,9 @@
  * page can react mid-session without polling.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Settings2, Pencil, Check, Sun, Moon } from "lucide-react";
+import { Settings2, Pencil, Check, Sun, Moon, Monitor } from "lucide-react";
 import { AUTO_GENERATE_VIZ, MAX_VIZ_GEN_RETRIES } from "@/lib/config";
 import { APP_VERSION } from "@/lib/version";
 import type { ProviderName } from "@/lib/provider-types";
@@ -42,7 +42,7 @@ export type SettingsPayload = {
   piModelSmart?: string;
   piProvider?: "ollama" | "gemini" | "openai" | "anthropic" | "custom";
   piApiType?: "openai-completions" | "google-generative-ai" | "anthropic-messages";
-  theme?: "light" | "dark";
+  theme?: "light" | "dark" | "system";
 };
 
 export const SETTINGS_EVENT = "getit:settings";
@@ -96,14 +96,14 @@ function EditableModelSelect({
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1.5 text-[12px] font-medium text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
+          className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1.5 text-[12px] font-medium text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
           placeholder="Custom model..."
         />
       ) : (
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1.5 text-[12px] font-medium text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
+          className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1.5 text-[12px] font-medium text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
         >
           {options.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
@@ -195,7 +195,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
   const [piProvider, setPiProvider] = useState<"ollama" | "gemini" | "openai" | "anthropic" | "custom">("ollama");
   const [piApiType, setPiApiType] = useState<"openai-completions" | "google-generative-ai" | "anthropic-messages">("openai-completions");
 
-  const [theme, setTheme] = useState<"light" | "dark" | undefined>();
+  const [theme, setTheme] = useState<"light" | "dark" | "system" | undefined>();
   const hydratedRef = useRef(false);
   const userToggledRef = useRef(false);
   const [osPrefersDark, setOsPrefersDark] = useState(false);
@@ -208,11 +208,8 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  // Effective theme — if no explicit preference is stored, follow system.
-  const effectiveTheme = useMemo<"light" | "dark">(() => {
-    if (theme === "light" || theme === "dark") return theme;
-    return osPrefersDark ? "dark" : "light";
-  }, [theme, osPrefersDark]);
+  // The chosen appearance mode — defaults to light when nothing is stored.
+  const selectedTheme = theme ?? "light";
 
   // Fetch fresh on every popover open
   useEffect(() => {
@@ -244,7 +241,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
         if (typeof s.piModelSmart === "string") setPiModelSmart(s.piModelSmart);
         if (typeof s.piProvider === "string") setPiProvider(s.piProvider);
         if (typeof s.piApiType === "string") setPiApiType(s.piApiType);
-        if (!userToggledRef.current && (s.theme === "light" || s.theme === "dark")) setTheme(s.theme);
+        if (!userToggledRef.current && (s.theme === "light" || s.theme === "dark" || s.theme === "system")) setTheme(s.theme);
 
         if (!cancelled) {
           setTimeout(() => {
@@ -379,13 +376,21 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
     }
   };
 
-  const onThemeToggle = useCallback(() => {
-    userToggledRef.current = true;
-    const next = effectiveTheme === "dark" ? "light" : "dark";
-    setTheme(next);
-    persist({ theme: next }, true);
-    document.documentElement.classList.toggle("dark", next === "dark");
-  }, [effectiveTheme, persist]);
+  const onThemeSelect = useCallback(
+    (next: "light" | "dark" | "system") => {
+      userToggledRef.current = true;
+      setTheme(next);
+      persist({ theme: next }, true);
+      // Apply immediately for snappy feedback; ThemeProvider also reacts to the
+      // settings event this dispatches. "system" resolves to the OS preference.
+      const wantDark =
+        next === "dark" ||
+        (next === "system" &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.classList.toggle("dark", wantDark);
+    },
+    [persist],
+  );
 
   return (
     <>
@@ -412,12 +417,12 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
             authenticates the new backend and verifies it works before applying.
             A free-floating dropdown here would bypass that and leave a broken
             provider selected, so we show the current engine + a guided Switch. */}
-        <div className="flex items-center justify-between gap-2 rounded-md border border-[var(--border-subtle)] bg-white px-2.5 py-1.5">
+        <div className="flex items-center justify-between gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2.5 py-1.5">
           <span className="text-[12px] font-medium text-[var(--ink-900)]">{ENGINE_LABEL[provider]}</span>
           <button
             type="button"
             onClick={() => window.getit?.runCodexSetup?.().catch(() => {})}
-            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1 text-[10.5px] font-medium text-[var(--ink-700)] transition hover:border-[var(--accent-300)] hover:text-[var(--accent-700)]"
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1 text-[10.5px] font-medium text-[var(--ink-700)] transition hover:border-[var(--accent-300)] hover:text-[var(--accent-700)]"
           >
             <Settings2 className="h-2.5 w-2.5" />
             Switch
@@ -436,7 +441,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
               placeholder="AIzaSy... (Required for Gemini)"
               value={geminiApiKey}
               onChange={(e) => setGeminiApiKey(e.target.value)}
-              className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-2.5 py-1.5 text-[12px] text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
+              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2.5 py-1.5 text-[12px] text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -506,7 +511,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
               <select
                 value={claudeEffortFast}
                 onChange={(e) => setClaudeEffortFast(e.target.value)}
-                className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1.5 text-[11px] text-[var(--ink-900)] shadow-sm focus:border-[var(--accent-500)] focus:outline-none"
+                className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1.5 text-[11px] text-[var(--ink-900)] shadow-sm focus:border-[var(--accent-500)] focus:outline-none"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium (Default for fast)</option>
@@ -522,7 +527,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
               <select
                 value={claudeEffortSmart}
                 onChange={(e) => setClaudeEffortSmart(e.target.value)}
-                className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1.5 text-[11px] text-[var(--ink-900)] shadow-sm focus:border-[var(--accent-500)] focus:outline-none"
+                className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1.5 text-[11px] text-[var(--ink-900)] shadow-sm focus:border-[var(--accent-500)] focus:outline-none"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -623,7 +628,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
             <select
               value={piProvider}
               onChange={(e) => handlePiProviderChange(e.target.value as NonNullable<SettingsPayload["piProvider"]>)}
-              className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1.5 text-[12px] font-medium text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
+              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1.5 text-[12px] font-medium text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
             >
               <option value="ollama">Ollama (Local)</option>
               <option value="gemini">Google Gemini (AI Studio)</option>
@@ -642,7 +647,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
                 setPiApiType(e.target.value as NonNullable<SettingsPayload["piApiType"]>);
                 persist({ piApiType: e.target.value as NonNullable<SettingsPayload["piApiType"]> });
               }}
-              className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-2 py-1.5 text-[12px] font-medium text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
+              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1.5 text-[12px] font-medium text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
             >
               <option value="openai-completions">OpenAI completions</option>
               <option value="google-generative-ai">Google Generative AI</option>
@@ -658,7 +663,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
               value={piUrl}
               onChange={(e) => setPiUrl(e.target.value)}
               placeholder="http://localhost:11434/v1"
-              className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-2.5 py-1.5 text-[12px] font-mono text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
+              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2.5 py-1.5 text-[12px] font-mono text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
             />
           </div>
           <div>
@@ -670,7 +675,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
               value={piApiKey}
               onChange={(e) => setPiApiKey(e.target.value)}
               placeholder={getApiKeyPlaceholder()}
-              className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-2.5 py-1.5 text-[12px] font-mono text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
+              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2.5 py-1.5 text-[12px] font-mono text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -682,7 +687,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
                 type="text"
                 value={piModelFast}
                 onChange={(e) => setPiModelFast(e.target.value)}
-                className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-2.5 py-1.5 text-[12px] font-mono text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
+                className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2.5 py-1.5 text-[12px] font-mono text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
               />
             </div>
             <div>
@@ -693,7 +698,7 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
                 type="text"
                 value={piModelSmart}
                 onChange={(e) => setPiModelSmart(e.target.value)}
-                className="w-full rounded-md border border-[var(--border-subtle)] bg-white px-2.5 py-1.5 text-[12px] font-mono text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
+                className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2.5 py-1.5 text-[12px] font-mono text-[var(--ink-900)] focus:border-[var(--accent-500)] focus:outline-none"
               />
             </div>
           </div>
@@ -731,45 +736,48 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
         </div>
       </div>
 
-      {/* Dark mode toggle */}
-      <div className="flex items-start gap-2.5 border-t border-[var(--border-subtle)] px-3 py-2.5">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={effectiveTheme === "dark"}
-          onClick={onThemeToggle}
-          className={`mt-0.5 inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${
-            effectiveTheme === "dark"
-              ? "bg-[var(--accent-600)]"
-              : "bg-[var(--surface-sunken)] ring-1 ring-inset ring-[var(--border-default)]"
-          }`}
+      {/* Appearance — light / system / dark */}
+      <div className="border-t border-[var(--border-subtle)] px-3 py-2.5">
+        <p className="mb-2 text-[12.5px] font-medium text-[var(--ink-900)]">
+          Appearance
+        </p>
+        <div
+          role="radiogroup"
+          aria-label="Appearance"
+          className="grid grid-cols-3 gap-1 rounded-md bg-[var(--surface-sunken)] p-1"
         >
-          <span
-            className={`inline-flex h-3 w-3 items-center justify-center rounded-full bg-white shadow transition-transform ${
-              effectiveTheme === "dark" ? "translate-x-3.5" : "translate-x-0.5"
-            }`}
-          >
-            {effectiveTheme === "dark" ? (
-              <Moon className="h-2 w-2 text-[var(--ink-700)]" />
-            ) : (
-              <Sun className="h-2 w-2 text-[var(--ink-500)]" />
-            )}
-          </span>
-        </button>
-        <div className="min-w-0 flex-1">
-          <p className="text-[12.5px] font-medium text-[var(--ink-900)]">
-            Dark mode
-          </p>
-          <p className="text-[11px] leading-relaxed text-[var(--ink-500)]">
-            {theme
-              ? effectiveTheme === "dark"
-                ? "Dark theme active."
-                : "Light theme active."
-              : effectiveTheme === "dark"
-                ? "Follows system — dark."
-                : "Follows system — light."}
-          </p>
+          {([
+            { value: "light", label: "Light", Icon: Sun },
+            { value: "system", label: "System", Icon: Monitor },
+            { value: "dark", label: "Dark", Icon: Moon },
+          ] as const).map(({ value, label, Icon }) => {
+            const active = selectedTheme === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => onThemeSelect(value)}
+                className={`inline-flex items-center justify-center gap-1.5 rounded px-2 py-1.5 text-[11.5px] font-medium transition-colors ${
+                  active
+                    ? "bg-[var(--surface-raised)] text-[var(--ink-900)] shadow-sm ring-1 ring-inset ring-[var(--border-default)]"
+                    : "text-[var(--ink-500)] hover:text-[var(--ink-900)]"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            );
+          })}
         </div>
+        <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--ink-500)]">
+          {selectedTheme === "system"
+            ? `Follows your system — currently ${osPrefersDark ? "dark" : "light"}.`
+            : selectedTheme === "dark"
+              ? "Dark theme active."
+              : "Light theme active."}
+        </p>
       </div>
 
       {/* Max retries number input */}

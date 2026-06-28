@@ -177,7 +177,7 @@ export default function LibraryClient() {
           </p>
 
           {error && (
-            <div className="mt-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700">
+            <div className="mt-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
               Could not load library: {error}
             </div>
           )}
@@ -336,7 +336,7 @@ function TagsBadge({
       title={`${tagsReady} of ${tagsTotal} visualizations ready`}
       className={
         allReady
-          ? "hidden shrink-0 items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10.5px] text-emerald-700 sm:inline-flex"
+          ? "hidden shrink-0 items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10.5px] text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 sm:inline-flex"
           : "hidden shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1 text-[10.5px] text-[var(--ink-500)] sm:inline-flex"
       }
     >
@@ -379,7 +379,7 @@ function KGBadge({
     return (
       <span
         title="Knowledge graph build errored"
-        className="hidden shrink-0 items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[10.5px] text-rose-700 sm:inline-flex"
+        className="hidden shrink-0 items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[10.5px] text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300 sm:inline-flex"
       >
         <Network className="h-3 w-3" />
         error
@@ -390,7 +390,7 @@ function KGBadge({
   return (
     <span
       title={`${evals} evaluation${evals === 1 ? "" : "s"} so far`}
-      className="hidden shrink-0 items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10.5px] text-emerald-700 sm:inline-flex"
+      className="hidden shrink-0 items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10.5px] text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 sm:inline-flex"
     >
       <Network className="h-3 w-3" />
       {evals === 0 ? "graph ready" : `${evals} eval${evals === 1 ? "" : "s"}`}

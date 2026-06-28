@@ -271,13 +271,13 @@ export default function ChatView({ docId }: Props) {
             )}
             {failed && failed.chatId === active.id && !sending && (
               <div className="mb-3 flex flex-col items-start gap-1.5">
-                <p className="text-[11.5px] leading-relaxed text-rose-700">
+                <p className="text-[11.5px] leading-relaxed text-rose-700 dark:text-rose-300">
                   Couldn&apos;t get a reply — {failed.error}
                 </p>
                 <button
                   type="button"
                   onClick={retry}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-[12px] font-medium text-rose-700 transition hover:bg-rose-100"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-[12px] font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300 dark:hover:bg-rose-900"
                 >
                   <RefreshCw className="h-3 w-3" /> Retry
                 </button>

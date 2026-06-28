@@ -317,11 +317,13 @@ function prefersDarkChrome() {
     const raw = fs.readFileSync(path.join(DATA_DIR, "settings.json"), "utf-8");
     const theme = JSON.parse(raw).theme;
     if (theme === "dark") return true;
-    if (theme === "light") return false;
+    if (theme === "system") return nativeTheme.shouldUseDarkColors;
+    // "light" or anything else → the light default
+    return false;
   } catch {
-    /* no saved setting — fall through to the OS preference */
+    /* no saved setting yet — default to light */
+    return false;
   }
-  return nativeTheme.shouldUseDarkColors;
 }
 
 // Editorial "ink on warm white" palette, matched to app/globals.css so the

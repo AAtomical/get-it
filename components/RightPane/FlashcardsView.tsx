@@ -268,7 +268,7 @@ export default function FlashcardsView({ docId }: Props) {
           </button>
           {error && (
             <div className="mt-2">
-              <p className="text-[11px] leading-relaxed text-rose-700">{error}</p>
+              <p className="text-[11px] leading-relaxed text-rose-700 dark:text-rose-300">{error}</p>
               <button
                 type="button"
                 onClick={generate}

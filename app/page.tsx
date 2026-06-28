@@ -66,7 +66,7 @@ export default function Home() {
             <Icon
               key={i}
               strokeWidth={1.4}
-              className="absolute text-black/[0.05]"
+              className="absolute text-[var(--ink-900)]/[0.05]"
               style={{
                 top,
                 [side]: off,

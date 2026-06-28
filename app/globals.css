@@ -1,6 +1,13 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Bind Tailwind's `dark:` variant to our `.dark` class (set on <html> by the
+   theme system) instead of the OS `prefers-color-scheme` default. Most of the
+   theme is driven by the CSS variables below; `dark:` is used sparingly to
+   re-tone the few semantic status pills (error/warn/success) whose light
+   pastel classes must stay exactly as-is. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ───────────────────────────────────────────────────────────────
    Get It. design system — clean, white-on-white, Reflect-grade.
    No gradients, no paper grain, no warm casts. Pure ink-on-paper.

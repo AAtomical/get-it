@@ -45,8 +45,9 @@ export type AppSettings = {
   piModelSmart?: string;
   piProvider?: "ollama" | "gemini" | "openai" | "anthropic" | "custom";
   piApiType?: "openai-completions" | "google-generative-ai" | "anthropic-messages";
-  /** Undefined means "follow system preference" (default). */
-  theme?: "light" | "dark";
+  /** Appearance: explicit "light"/"dark", or "system" to follow the OS.
+   *  Defaults to "light" when unset. */
+  theme?: "light" | "dark" | "system";
 };
 
 const VERSION = 2 as const; // Bumped to 2 for new settings structure
@@ -70,6 +71,7 @@ function defaultsFromEnv(): AppSettings {
   return {
     autoGenerate: AUTO_GENERATE_VIZ,
     maxRetries: MAX_VIZ_GEN_RETRIES,
+    theme: "light",
     provider: "codex",
     codexModelFast: "gpt-5.5",
     codexModelSmart: "gpt-5.5",
@@ -164,9 +166,12 @@ export function loadSettings(): AppSettings {
         piProvider: piProvider as AppSettings["piProvider"],
         piApiType: piApiType as AppSettings["piApiType"],
       };
-      if (parsed.theme === "light" || parsed.theme === "dark") {
-        s.theme = parsed.theme;
-      }
+      s.theme =
+        parsed.theme === "light" ||
+        parsed.theme === "dark" ||
+        parsed.theme === "system"
+          ? parsed.theme
+          : "light"; // default to light when unset/legacy
       return s;
     }
   } catch {
@@ -200,7 +205,7 @@ export function saveSettings(s: AppSettings): void {
     piProvider: s.piProvider,
     piApiType: s.piApiType,
   };
-  if (s.theme === "light" || s.theme === "dark") {
+  if (s.theme === "light" || s.theme === "dark" || s.theme === "system") {
     file.theme = s.theme;
   }
   const tmp = `${SETTINGS_PATH}.${randomUUID()}.tmp`;

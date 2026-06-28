@@ -210,7 +210,7 @@ function DismissRow({
           target="_blank"
           rel="noopener noreferrer"
           onClick={onPrimary}
-          className="inline-flex items-center gap-1.5 rounded-md bg-[var(--ink-900)] px-3.5 py-1.5 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-black"
+          className="inline-flex items-center gap-1.5 rounded-md bg-[var(--button-primary-bg)] px-3.5 py-1.5 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-[var(--button-primary-hover)]"
         >
           {primaryLabel}
         </a>
@@ -218,7 +218,7 @@ function DismissRow({
         <button
           type="button"
           onClick={onPrimary}
-          className="rounded-md bg-[var(--ink-900)] px-3.5 py-1.5 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-black"
+          className="rounded-md bg-[var(--button-primary-bg)] px-3.5 py-1.5 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-[var(--button-primary-hover)]"
         >
           {primaryLabel}
         </button>

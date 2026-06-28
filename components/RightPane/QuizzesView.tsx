@@ -225,12 +225,12 @@ export default function QuizzesView({ docId }: Props) {
           </button>
           {error && (
             <div className="mt-2">
-              <p className="text-[11px] leading-relaxed text-rose-700">{error}</p>
+              <p className="text-[11px] leading-relaxed text-rose-700 dark:text-rose-300">{error}</p>
               <button
                 type="button"
                 onClick={generate}
                 disabled={generating}
-                className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-medium text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-medium text-rose-700 transition hover:bg-rose-100 disabled:opacity-50 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300 dark:hover:bg-rose-900"
               >
                 <RefreshCw className="h-3 w-3" /> Retry
               </button>

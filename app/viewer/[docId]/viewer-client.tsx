@@ -424,7 +424,7 @@ export default function ViewerClient({ docId }: { docId: string }) {
         <p className="text-sm text-[var(--ink-700)]">{loadError}</p>
         <Link
           href="/"
-          className="rounded-full bg-[var(--ink-900)] px-4 py-1.5 text-sm font-medium text-white hover:bg-black"
+          className="rounded-full bg-[var(--button-primary-bg)] px-4 py-1.5 text-sm font-medium text-white hover:bg-[var(--button-primary-hover)]"
         >
           Back to upload
         </Link>
@@ -477,7 +477,7 @@ export default function ViewerClient({ docId }: { docId: string }) {
           <FileText className="h-3.5 w-3.5 text-[var(--accent-600)]" />
           <span className="max-w-[180px] truncate">{truncated}</span>
           {!autoGenerate && (
-            <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wider text-amber-700">
+            <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wider text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
               <MousePointerClick className="h-2.5 w-2.5" /> manual
             </span>
           )}
@@ -597,7 +597,7 @@ function TagsChip({
             <span className="text-[var(--ink-500)]">pages</span>
           </>
         ) : error ? (
-          <span className="font-medium text-rose-700">Failed</span>
+          <span className="font-medium text-rose-700 dark:text-rose-300">Failed</span>
         ) : (
           <>
             <span className="tabular-nums font-medium text-[var(--ink-900)]">
@@ -683,7 +683,7 @@ function KGStatusBadge({ docId }: { docId: string }) {
   } else if (state.status === "error") {
     icon = <AlertCircle className="h-3 w-3 text-rose-500" />;
     label = "Graph error";
-    valueTone = "text-rose-700";
+    valueTone = "text-rose-700 dark:text-rose-300";
     title = state.buildError ?? "Graph build failed";
   } else if (state.evaluating) {
     icon = <RefreshCw className="h-3 w-3 animate-spin text-[var(--accent-600)]" />;
@@ -728,7 +728,7 @@ function KGStatusBadge({ docId }: { docId: string }) {
                   }`;
               navigator.clipboard.writeText(textToCopy);
             }}
-            className="p-1 hover:bg-gray-100 rounded transition-colors text-[var(--ink-500)] hover:text-[var(--ink-900)] shrink-0"
+            className="p-1 hover:bg-gray-100 dark:hover:bg-[var(--surface-sunken)] rounded transition-colors text-[var(--ink-500)] hover:text-[var(--ink-900)] shrink-0"
             title="Copy message"
           >
             <Copy className="h-3 w-3" />

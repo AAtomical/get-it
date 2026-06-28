@@ -39,8 +39,8 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
 try {
-  var t = ${JSON.stringify(theme ?? null)};
-  if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+  var t = ${JSON.stringify(theme ?? "light")};
+  if (t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
     document.documentElement.classList.add('dark');
   } else {
     document.documentElement.classList.remove('dark');

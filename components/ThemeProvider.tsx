@@ -6,11 +6,12 @@ import { SETTINGS_EVENT } from "@/components/SettingsButton";
 function applyTheme(theme: string | undefined) {
   if (theme === "dark") {
     document.documentElement.classList.add("dark");
-  } else if (theme === "light") {
-    document.documentElement.classList.remove("dark");
-  } else {
+  } else if (theme === "system") {
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     document.documentElement.classList.toggle("dark", prefersDark);
+  } else {
+    // "light" (and the default when unset) → force light
+    document.documentElement.classList.remove("dark");
   }
 }
 
@@ -19,7 +20,7 @@ export default function ThemeProvider({
   initialTheme,
 }: {
   children: React.ReactNode;
-  initialTheme?: "light" | "dark";
+  initialTheme?: "light" | "dark" | "system";
 }) {
   // No async fetch needed — the root layout sets the class during SSR and a
   // blocking inline script handles the system-preference fallback. This

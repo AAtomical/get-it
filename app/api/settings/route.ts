@@ -55,13 +55,10 @@ export async function POST(req: Request) {
     piProvider: typeof b.piProvider === "string" ? b.piProvider : current.piProvider,
     piApiType: typeof b.piApiType === "string" ? b.piApiType : current.piApiType,
   };
-  next.theme = current.theme;
-  if (b.theme === "light" || b.theme === "dark") {
-    next.theme = b.theme;
-  } else if (b.theme === null) {
-    // Explicitly clearing the theme preference (back to system).
-    delete next.theme;
-  }
+  next.theme =
+    b.theme === "light" || b.theme === "dark" || b.theme === "system"
+      ? b.theme
+      : current.theme;
   saveSettings(next);
   return NextResponse.json(next);
 }
