@@ -77,7 +77,7 @@ A quick map of the codebase:
 
 ## Opening a pull request
 
-1. Branch off `main`.
+1. Fork the project and create a branch off the `developer` branch. All Pull Requests should target the `developer` branch to be included in preview builds.
 2. Keep the change focused. One idea per pull request is easier to review and land.
 3. Match the surrounding code: its naming, comment density, and style. Read the relevant file before you edit it.
 4. Make sure it builds and type-checks before you push:
@@ -90,6 +90,7 @@ A quick map of the codebase:
 
 5. Write a clear description: what changed, why, and how you tested it. Screenshots help for anything visual.
 6. If the change is large or you are unsure about direction, talk it through on Discord first so your time goes where it counts.
+7. After creating the PR, please read the report messages from the PR checker bots. They can highlight automated issues (like linting or test failures) that you might want to resolve to speed up the review.
 
 We aim to be quick and kind in review. If something is not merged right away, it is about the change, never about you.
 
