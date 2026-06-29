@@ -435,7 +435,7 @@ function VisualizerBody({
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--ink-400)] [animation-delay:150ms]" />
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--ink-400)] [animation-delay:300ms]" />
             </div>
-            <p className="text-xs">{providerLabel ?? "Codex CLI"} is composing the visualization</p>
+            <p className="text-xs">{providerLabel ?? "The AI engine"} is composing the visualization</p>
             {loadingDetail && <p className="text-[11px] text-[var(--ink-400)]">{loadingDetail}</p>}
           </div>
         </motion.div>

@@ -210,7 +210,7 @@ export default function PdfViewer({
           {detecting && (
           <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-[var(--border-subtle)] bg-[var(--surface-raised)]/90 px-4 py-2 text-[12px] text-[var(--ink-500)] backdrop-blur">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent-600)]" />
-            {providerLabel ?? "Codex CLI"} is reading your document and tagging concepts…
+            {providerLabel ?? "The AI engine"} is reading your document and tagging concepts…
           </div>
         )}
         <div className="flex flex-col items-center gap-7 px-6 py-8">

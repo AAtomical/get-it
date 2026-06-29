@@ -516,6 +516,7 @@ export default function ViewerClient({ docId }: { docId: string }) {
             docId={docId}
             mode={rightPaneMode}
             onModeChange={setRightPaneMode}
+            providerLabel={PROVIDER_LABELS[provider]}
             visualizer={{
               spec: activeTag?.generating || activeTag?.error ? null : activeSpec,
               loading:

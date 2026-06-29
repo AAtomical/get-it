@@ -102,7 +102,7 @@ export default function KnowledgeGraphView({ docId, onJumpToTool, providerLabel 
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--ink-400)] [animation-delay:300ms]" />
         </div>
         <p className="text-[12.5px] text-[var(--ink-500)]">
-          {providerLabel ?? "Codex CLI"} is mapping the document&apos;s concept graph
+          {providerLabel ?? "The AI engine"} is mapping the document&apos;s concept graph
         </p>
         <p className="text-[10.5px] text-[var(--ink-400)]">
           this runs once per document, in parallel with concept detection
