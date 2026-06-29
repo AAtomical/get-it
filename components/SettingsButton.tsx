@@ -705,39 +705,8 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
         </div>
       )}
 
-      {/* Auto-generate toggle */}
-      <div className="flex items-start gap-2.5 px-3 py-2.5">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={autoGenerate}
-          onClick={() => onAutoGenerate(!autoGenerate)}
-          className={`mt-0.5 inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${
-            autoGenerate
-              ? "bg-[var(--accent-600)]"
-              : "bg-[var(--surface-sunken)] ring-1 ring-inset ring-[var(--border-default)]"
-          }`}
-        >
-          <span
-            className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
-              autoGenerate ? "translate-x-3.5" : "translate-x-0.5"
-            }`}
-          />
-        </button>
-        <div className="min-w-0 flex-1">
-          <p className="text-[12.5px] font-medium text-[var(--ink-900)]">
-            Auto-generate visualizations
-          </p>
-          <p className="text-[11px] leading-relaxed text-[var(--ink-500)]">
-            {autoGenerate
-              ? "Every detected tag fires its viz generation in parallel."
-              : "Tags appear after detection but only render on click."}
-          </p>
-        </div>
-      </div>
-
       {/* Appearance — light / system / dark */}
-      <div className="border-t border-[var(--border-subtle)] px-3 py-2.5">
+      <div className="px-3 py-2.5">
         <p className="mb-2 text-[12.5px] font-medium text-[var(--ink-900)]">
           Appearance
         </p>
@@ -778,6 +747,37 @@ function SettingsPanel({ refreshKey }: { refreshKey: string }) {
               ? "Dark theme active."
               : "Light theme active."}
         </p>
+      </div>
+
+      {/* Auto-generate toggle */}
+      <div className="flex items-start gap-2.5 border-t border-[var(--border-subtle)] px-3 py-2.5">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={autoGenerate}
+          onClick={() => onAutoGenerate(!autoGenerate)}
+          className={`mt-0.5 inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${
+            autoGenerate
+              ? "bg-[var(--accent-600)]"
+              : "bg-[var(--surface-sunken)] ring-1 ring-inset ring-[var(--border-default)]"
+          }`}
+        >
+          <span
+            className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
+              autoGenerate ? "translate-x-3.5" : "translate-x-0.5"
+            }`}
+          />
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="text-[12.5px] font-medium text-[var(--ink-900)]">
+            Auto-generate visualizations
+          </p>
+          <p className="text-[11px] leading-relaxed text-[var(--ink-500)]">
+            {autoGenerate
+              ? "Every detected tag fires its viz generation in parallel."
+              : "Tags appear after detection but only render on click."}
+          </p>
+        </div>
       </div>
 
       {/* Max retries number input */}
