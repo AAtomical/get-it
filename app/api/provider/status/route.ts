@@ -30,12 +30,16 @@ type ProviderStatus = {
   installed: boolean;
   authenticated: boolean;
   version: string | null;
-  /** "account" → show plan/limits; "apiKey" → show token usage. */
+  /** "account" → subscription login; "apiKey" → key/BYOK. */
   authMode: "account" | "apiKey" | null;
+  /** True only when the engine exposes readable 5h/weekly limits (Codex on a
+   *  ChatGPT login). Everything else — Claude (no limit surface), Gemini, Pi,
+   *  Codex-on-API-key — shows daily token usage instead. */
+  exposesLimits: boolean;
   // Codex-specific fields (null for other providers)
   account: CodexAccountInfo | null;
   rateLimits: CodexRateLimits | null;
-  /** Cumulative token usage (shown for apiKey providers; informational for account). */
+  /** Per-day token usage (the panel shows it for every non-limit engine). */
   usage: ProviderUsage | null;
 };
 
@@ -137,6 +141,8 @@ export async function GET() {
       authenticated: !!account?.email,
       version: null,
       authMode: isApiKey ? "apiKey" : "account",
+      // Only a ChatGPT-login Codex exposes the 5h/weekly windows.
+      exposesLimits: !isApiKey,
       account,
       rateLimits: limits,
       usage,
@@ -158,6 +164,7 @@ export async function GET() {
       authenticated: configured,
       version: null,
       authMode: "apiKey",
+      exposesLimits: false,
       account: configured
         ? {
             email: settings.piUrl ?? null,
@@ -230,6 +237,8 @@ export async function GET() {
     authenticated,
     version,
     authMode,
+    // Claude (no readable limit surface) and Gemini both show token usage.
+    exposesLimits: false,
     account,
     rateLimits: null,
     usage,

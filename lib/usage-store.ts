@@ -1,10 +1,16 @@
 /**
- * Cumulative token-usage tracker, persisted per provider.
+ * Per-provider, per-DAY token-usage tracker.
  *
  * Every AI call flows through lib/codex.ts, which records the call's token
- * usage here. The account panel reads it to show "tokens used" for API-key /
- * BYOK providers (Gemini, Pi, and Codex/Claude when run on an API key), where
- * there is no readable subscription-limit surface.
+ * usage here. The account panel reads it to show "tokens today" for every
+ * engine that has no readable subscription-limit surface (Claude, Gemini, Pi,
+ * and Codex on an API key) — Codex on a ChatGPT login shows its own 5h/weekly
+ * limits instead.
+ *
+ * Counts are scoped to the local calendar day and reset automatically at
+ * midnight: each provider's record carries the `day` it belongs to, and a read
+ * or record for a new day starts that provider fresh. Engines are tracked
+ * independently, so switching provider never mixes their numbers.
  *
  * Raw per-call usage shapes differ by provider; `normalizeUsage` maps each to
  * a common { inputTokens, outputTokens, costUsd } delta. All paths swallow
@@ -23,7 +29,9 @@ export type ProviderUsage = {
   /** USD cost when the provider reports it (Claude, Pi); 0 otherwise. */
   costUsd: number;
   calls: number;
-  /** First time we recorded usage for this provider (ms epoch). */
+  /** Local calendar day (YYYY-MM-DD) these counts belong to; resets daily. */
+  day: string | null;
+  /** Start of the current day's counting (ms epoch). */
   since: number | null;
   updatedAt: number | null;
 };
@@ -34,6 +42,7 @@ const ZERO: ProviderUsage = {
   totalTokens: 0,
   costUsd: 0,
   calls: 0,
+  day: null,
   since: null,
   updatedAt: null,
 };
@@ -42,6 +51,11 @@ type UsageFile = Partial<Record<ProviderName, ProviderUsage>>;
 
 function usagePath(): string {
   return path.join(DATA_DIR, "usage.json");
+}
+
+/** Local calendar day, e.g. "2026-06-29" (en-CA renders ISO YYYY-MM-DD). */
+function todayKey(): string {
+  return new Date().toLocaleDateString("en-CA");
 }
 
 function load(): UsageFile {
@@ -62,7 +76,10 @@ function persist(all: UsageFile): void {
 }
 
 export function readUsage(provider: ProviderName): ProviderUsage {
-  return { ...ZERO, ...(load()[provider] ?? {}) };
+  const cur = { ...ZERO, ...(load()[provider] ?? {}) };
+  // A record from a previous day reads as zero — today's usage hasn't started.
+  if (cur.day !== todayKey()) return { ...ZERO, day: todayKey() };
+  return cur;
 }
 
 export function resetUsage(provider: ProviderName): void {
@@ -73,17 +90,23 @@ export function resetUsage(provider: ProviderName): void {
 
 export type UsageDelta = { inputTokens: number; outputTokens: number; costUsd: number };
 
-/** Add one call's usage to a provider's running total. */
+/** Add one call's usage to a provider's running total for the current day. */
 export function recordUsage(provider: ProviderName, delta: UsageDelta): void {
   try {
     const all = load();
-    const cur = { ...ZERO, ...(all[provider] ?? {}) };
+    const today = todayKey();
+    const stored = all[provider];
+    // Start a fresh bucket when there's nothing yet or the stored counts belong
+    // to an earlier day (daily reset).
+    const cur =
+      stored && stored.day === today ? { ...ZERO, ...stored } : { ...ZERO, day: today };
     const now = Date.now();
     cur.inputTokens += Math.max(0, delta.inputTokens || 0);
     cur.outputTokens += Math.max(0, delta.outputTokens || 0);
     cur.totalTokens = cur.inputTokens + cur.outputTokens;
     cur.costUsd += Math.max(0, delta.costUsd || 0);
     cur.calls += 1;
+    cur.day = today;
     cur.since = cur.since ?? now;
     cur.updatedAt = now;
     all[provider] = cur;

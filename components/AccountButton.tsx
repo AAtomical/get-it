@@ -4,9 +4,9 @@
  * Top-bar Account button + popover. One coherent panel for every provider:
  *
  *   • Identity (email / plan) when connected, or a "Connect" prompt.
- *   • Usage — subscription LIMITS for account logins that expose them (Codex
- *     ChatGPT), or cumulative TOKENS USED for API-key / BYOK providers
- *     (Gemini, Pi, and Codex/Claude on an API key) where no limit is readable.
+ *   • Usage — subscription LIMITS only for engines that expose them (Codex on
+ *     a ChatGPT login: 5h/weekly), or per-day TOKENS for everyone else
+ *     (Claude, Gemini, Pi, and Codex on an API key) where no limit is readable.
  *   • Provider-agnostic Sign out + Switch provider, both routed through the
  *     single setup wizard.
  */
@@ -50,6 +50,9 @@ type ProviderStatus = {
   authenticated: boolean;
   version: string | null;
   authMode: "account" | "apiKey" | null;
+  /** True only for Codex on a ChatGPT login (5h/weekly limits); everything
+   *  else shows daily token usage. */
+  exposesLimits?: boolean;
   account: {
     email: string | null;
     name: string | null;
@@ -251,13 +254,13 @@ function AccountPanel({ open }: { open: boolean }) {
             </div>
           )}
 
-          {/* Usage display is tied to the auth MODE, not to whatever happens to
-              be readable this poll: an account engine (Codex ChatGPT / Claude
-              subscription) always shows subscription limits, and an api-key
-              engine always shows token usage. Without this split, a transient
-              rate-limit read failure on an account engine would silently flip
-              the panel to tokens — which looks like a provider switch but isn't. */}
-          {data.authMode === "account" ? (
+          {/* The view is tied to whether the engine EXPOSES limits, not to the
+              auth mode: only Codex on a ChatGPT login surfaces 5h/weekly windows
+              and keeps showing them (a transient read miss shows a placeholder,
+              never a silent flip to tokens). Every other engine — Claude (no
+              limit surface), Gemini, Pi, Codex-on-API-key — shows daily token
+              usage instead. */}
+          {data.exposesLimits ? (
             data.rateLimits && (data.rateLimits.primary || data.rateLimits.secondary) ? (
               <div className="mt-4 space-y-1.5">
                 <LimitRow label="5h limit" win={data.rateLimits.primary} />
@@ -272,7 +275,7 @@ function AccountPanel({ open }: { open: boolean }) {
             <UsageRow usage={data.usage} showCost={data.authMode === "apiKey"} />
           ) : data.authenticated ? (
             <div className="mt-4 text-[10.5px] text-[var(--ink-400)]">
-              No usage recorded yet.
+              No tokens used today yet.
             </div>
           ) : null}
 
@@ -313,7 +316,7 @@ function UsageRow({ usage, showCost }: { usage: ProviderUsage; showCost: boolean
     <div className="mt-4">
       <div className="flex items-center justify-between text-[11px]">
         <span className="inline-flex items-center gap-1 font-medium text-[var(--ink-700)]">
-          <Gauge className="h-3 w-3 text-[var(--accent-600)]" /> Tokens used
+          <Gauge className="h-3 w-3 text-[var(--accent-600)]" /> Tokens today
         </span>
         <span className="tabular-nums text-[var(--ink-900)]">
           {fmtTokens(usage.totalTokens)}
