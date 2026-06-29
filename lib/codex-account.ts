@@ -223,7 +223,28 @@ function pickWindow(raw: unknown): CodexRateLimitWindow | null {
   return { usedPercent, windowDurationMins, resetsAt };
 }
 
+let _lastGoodRateLimits: CodexRateLimits | null = null;
+
+/**
+ * Read Codex rate-limit windows, with a process-local last-good cache.
+ *
+ * The underlying `codex app-server` JSON-RPC spawn is flaky by nature (a 5s
+ * timeout, cold subprocess start, a busy machine). A transient null must not
+ * blank the account panel — worse, it used to make an account engine fall back
+ * to a token display, which reads like a silent provider switch. So once we
+ * have read real windows we keep them and re-serve them whenever a fresh read
+ * fails or comes back empty, until the next good read refreshes them.
+ */
 export async function readRateLimits(timeoutMs = 5000): Promise<CodexRateLimits | null> {
+  const fresh = await readRateLimitsRaw(timeoutMs);
+  if (fresh && (fresh.primary || fresh.secondary)) {
+    _lastGoodRateLimits = fresh;
+    return fresh;
+  }
+  return _lastGoodRateLimits ?? fresh;
+}
+
+async function readRateLimitsRaw(timeoutMs = 5000): Promise<CodexRateLimits | null> {
   const bin = resolveCodexBinary();
   if (!bin) return null;
   return new Promise((resolve) => {

@@ -251,12 +251,23 @@ function AccountPanel({ open }: { open: boolean }) {
             </div>
           )}
 
-          {/* Usage: limits (account) or tokens (api-key) */}
-          {data.rateLimits && (data.rateLimits.primary || data.rateLimits.secondary) ? (
-            <div className="mt-4 space-y-1.5">
-              <LimitRow label="5h limit" win={data.rateLimits.primary} />
-              <LimitRow label="Weekly limit" win={data.rateLimits.secondary} />
-            </div>
+          {/* Usage display is tied to the auth MODE, not to whatever happens to
+              be readable this poll: an account engine (Codex ChatGPT / Claude
+              subscription) always shows subscription limits, and an api-key
+              engine always shows token usage. Without this split, a transient
+              rate-limit read failure on an account engine would silently flip
+              the panel to tokens — which looks like a provider switch but isn't. */}
+          {data.authMode === "account" ? (
+            data.rateLimits && (data.rateLimits.primary || data.rateLimits.secondary) ? (
+              <div className="mt-4 space-y-1.5">
+                <LimitRow label="5h limit" win={data.rateLimits.primary} />
+                <LimitRow label="Weekly limit" win={data.rateLimits.secondary} />
+              </div>
+            ) : data.authenticated ? (
+              <div className="mt-4 text-[10.5px] text-[var(--ink-400)]">
+                Usage limits unavailable right now — they&apos;ll reappear shortly.
+              </div>
+            ) : null
           ) : data.authenticated && data.usage && data.usage.calls > 0 ? (
             <UsageRow usage={data.usage} showCost={data.authMode === "apiKey"} />
           ) : data.authenticated ? (
