@@ -68,6 +68,9 @@ export default function TwoDAnimView({ spec, onRuntimeError }: Props) {
       reportError(`Animation crashed at setup: ${(e as Error).message}`);
     }
 
+    // Contract: `time` and `dt` are in SECONDS (the generator prompt states this
+    // explicitly). A spec that wrongly treats them as milliseconds appears
+    // frozen — regenerate it (the prompt fix makes the new spec correct).
     const t0 = performance.now();
     const tick = (now: number) => {
       const t = (now - t0) / 1000;
@@ -83,8 +86,6 @@ export default function TwoDAnimView({ spec, onRuntimeError }: Props) {
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-
-
 
     const ro = new ResizeObserver(resize);
     ro.observe(container);

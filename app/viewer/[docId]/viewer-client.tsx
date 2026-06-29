@@ -355,6 +355,29 @@ export default function ViewerClient({ docId }: { docId: string }) {
     [docId],
   );
 
+  // User asked to regenerate the active visualization from scratch (it looks
+  // wrong, stopped animating, etc.). Unlike handleTagClick, this re-queues even
+  // when a valid spec already exists. We drop the cached spec optimistically so
+  // the spinner shows at once; the server treats it as a fresh generation (no
+  // lastRuntimeError ⇒ no repair context) with the current prompt.
+  const handleRegenerateTag = useCallback(
+    (tagId: string) => {
+      setTags((prev) =>
+        prev.map((t) =>
+          t.id === tagId
+            ? { ...t, spec: undefined, ready: false, generating: true, error: undefined, lastRuntimeError: undefined }
+            : t,
+        ),
+      );
+      void fetch(`/api/jobs/viz/${docId}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tagId }),
+      }).catch(() => {});
+    },
+    [docId],
+  );
+
   // User asked to retry a single failed graph → clear the terminal error
   // and re-queue just that tag.
   const handleRetryTag = useCallback(
@@ -539,6 +562,10 @@ export default function ViewerClient({ docId }: { docId: string }) {
                     : "Click any tag to generate its visualization. (manual mode — toggle auto-generate in settings)",
               activeTagError: activeTag?.error ?? null,
               onRetry: activeTag ? () => handleTagClick(activeTag.id) : undefined,
+              onRegenerate:
+                activeTag && activeTag.spec && !activeTag.generating
+                  ? () => handleRegenerateTag(activeTag.id)
+                  : undefined,
             }}
           />
         </div>

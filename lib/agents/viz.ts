@@ -57,6 +57,9 @@ The body MUST do all of the following:
     tetrahedral angles (109.5°); benzene needs a planar hexagonal carbon
     ring with hydrogens; a cell needs nucleus + visible organelles.
   - return an object with an optional update(t) callback for animation.
+    't' is the elapsed time in SECONDS since start (a float growing by ~0.016
+    per frame). Use 't' DIRECTLY (e.g. group.rotation.y = t * 0.5); do NOT
+    multiply or divide it by 1000 or 0.001 — it is seconds, not milliseconds.
 
 CONSTRAINTS:
   - Use ONLY 'THREE' (already imported) and standard math globals (Math, etc).
@@ -83,6 +86,12 @@ Produce a JSON object matching the schema. The "setup_code" field MUST be
 a JavaScript function BODY invoked as
    new Function("api", body)({ ctx, width, height });
 The body MUST return an object { draw(ctx, width, height, time, dt) }.
+UNITS: 'time' is the elapsed time in SECONDS since the animation started (a
+float that grows by ~0.016 each frame); 'dt' is the SECONDS since the previous
+frame (~0.016). Drive motion with 'time' DIRECTLY, e.g. Math.sin(time * 2).
+Do NOT multiply or divide 'time'/'dt' by 1000 or 0.001 — they are already in
+seconds, never milliseconds. (Scaling 'time' by 0.001 makes the animation
+appear frozen.)
 
 The draw callback runs every frame. Build an INFORMATIVE animation:
   - inclined plane: slope, block sliding with correct g·sin(θ) acceleration

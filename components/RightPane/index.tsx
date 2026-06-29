@@ -117,6 +117,8 @@ type Props = {
     onRuntimeError?: (msg: string) => void;
     activeTagError?: string | null;
     onRetry?: () => void;
+    /** Force a fresh regeneration of the active visualization. */
+    onRegenerate?: () => void;
   };
 };
 
@@ -128,6 +130,7 @@ export default function RightPane({ docId, mode, onModeChange, visualizer, provi
         mode={mode}
         onModeChange={onModeChange}
         visualizerSpec={visualizer.spec}
+        onRegenerate={mode === "visualizer" ? visualizer.onRegenerate : undefined}
       />
 
       <div className="relative min-h-0 flex-1 bg-[var(--surface-raised)]">
@@ -197,11 +200,13 @@ function Header({
   mode,
   onModeChange,
   visualizerSpec,
+  onRegenerate,
 }: {
   docId: string;
   mode: RightPaneMode;
   onModeChange: (m: RightPaneMode) => void;
   visualizerSpec: VizSpec | null;
+  onRegenerate?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -377,6 +382,27 @@ function Header({
               transition={{ duration: 0.12 }}
               className="absolute right-0 top-full z-20 mt-1.5 w-72 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] shadow-[var(--shadow-popover)]"
             >
+              {visualizerSpec && onRegenerate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    onRegenerate();
+                  }}
+                  className="flex w-full items-start gap-2.5 border-b border-[var(--border-subtle)] px-3 py-2 text-left transition-colors hover:bg-[var(--surface-sunken)]"
+                >
+                  <RefreshCw className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ink-500)]" />
+                  <div className="min-w-0">
+                    <p className="text-[12.5px] font-medium text-[var(--ink-900)]">
+                      Regenerate visualization
+                    </p>
+                    <p className="text-[11px] leading-relaxed text-[var(--ink-500)]">
+                      Build this concept&apos;s visualization again from scratch — useful if it
+                      looks wrong, stopped animating, or you just want a fresh take.
+                    </p>
+                  </div>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={downloadWorkContext}
