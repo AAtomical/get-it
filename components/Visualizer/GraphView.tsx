@@ -11,10 +11,17 @@ type Props = {
 
 const COLORS = ["#5b66f1", "#d97706", "#db2777", "#7c3aed", "#059669", "#dc2626"];
 
+const FORBIDDEN = [
+  "window","document","fetch","XMLHttpRequest","WebSocket",
+  "require","Function","eval","globalThis","self",
+  "process","navigator","location","localStorage","sessionStorage",
+] as const;
+const FORBIDDEN_UNDEFS = FORBIDDEN.map(() => undefined);
+
 function safeFn(expr: string): (x: number) => number {
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
-  const fn = new Function("Math", "x", `return (${expr});`) as (M: typeof Math, x: number) => number;
-  return (x: number) => fn(Math, x);
+  const fn = new Function("Math", "x", ...FORBIDDEN, `return (function(){"use strict";return (${expr})})();`) as (...args: unknown[]) => number;
+  return (x: number) => fn(Math, x, ...FORBIDDEN_UNDEFS);
 }
 
 export default function GraphView({ spec, onRuntimeError }: Props) {
